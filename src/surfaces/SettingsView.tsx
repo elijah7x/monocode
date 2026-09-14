@@ -1,3 +1,4 @@
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   ArrowDownCircle,
   Check,
@@ -28,7 +29,8 @@ import { useLockOverscroll } from "../hooks/useLockOverscroll";
 import { useColorScheme } from "../hooks/useColorScheme";
 import {
   applyChatBackground,
-  applyChatBackgroundOpacity,
+  applyChatBackgroundEmptyOpacity,
+  applyChatBackgroundSessionOpacity,
   applyChatBackgroundScope,
   applyBodyGlass,
   applyThemePreference,
@@ -36,15 +38,17 @@ import {
   applySidebarOpacity,
   applyThemeTint,
   BODY_GLASS_DEFAULT,
-  CHAT_BACKGROUND_OPACITY_DEFAULT,
+  CHAT_BACKGROUND_EMPTY_OPACITY_DEFAULT,
   CHAT_BACKGROUND_OPACITY_MAX,
   CHAT_BACKGROUND_OPACITY_MIN,
+  CHAT_BACKGROUND_SESSION_OPACITY_DEFAULT,
   CHAT_BACKGROUND_SCOPE_DEFAULT,
   THEME_PREFERENCE_DEFAULT,
   chatBackgroundSrc,
   loadBodyGlass,
-  loadChatBackgroundOpacity,
+  loadChatBackgroundEmptyOpacity,
   loadChatBackgroundPath,
+  loadChatBackgroundSessionOpacity,
   loadChatBackgroundScope,
   loadThemePreference,
   loadSidebarBlur,
@@ -54,8 +58,9 @@ import {
   loadTranscriptLayout,
   loadTranscriptAnchor,
   saveBodyGlass,
-  saveChatBackgroundOpacity,
+  saveChatBackgroundEmptyOpacity,
   saveChatBackgroundPath,
+  saveChatBackgroundSessionOpacity,
   saveChatBackgroundScope,
   saveThemePreference,
   saveSidebarBlur,
@@ -134,7 +139,11 @@ import {
   saveSessionSidebarFilters,
 } from "../lib/sessionFilters";
 import type { SessionSummary } from "../lib/sessionStore";
-import { clearInboxCache } from "../lib/githubTasks";
+import {
+  clearInboxCache,
+  githubStatus,
+  type GithubStatus,
+} from "../lib/githubTasks";
 import {
   disconnectGitlab,
   gitlabConnected,
@@ -156,6 +165,7 @@ import {
   filterKeybindings,
   KEYBINDINGS,
   loadClaudeHooks,
+  loadComposerEffortVisible,
   loadComposerRunner,
   loadDiffViewer,
   loadFollowUpBehavior,
@@ -163,6 +173,7 @@ import {
   loadLiveAgentsEnabled,
   loadNotesEnabled,
   saveClaudeHooks,
+  saveComposerEffortVisible,
   saveComposerRunner,
   saveDiffViewer,
   saveFollowUpBehavior,
@@ -194,8 +205,18 @@ import {
 
 import { SkillsPage } from "./SkillsPage";
 
+export type SettingsAnchor = "github" | "gitlab" | "linear";
+
+const ANCHOR_IDS: Record<SettingsAnchor, string> = {
+  github: "settings-github",
+  gitlab: "settings-gitlab",
+  linear: "settings-linear",
+};
+
 type Props = {
   section: SettingsSectionId;
+  /** Card to scroll to; the General page is too long to land at the top. */
+  anchor?: SettingsAnchor | null;
   cwd: string;
   sessions: SessionSummary[];
   besideRail?: boolean;
@@ -210,6 +231,7 @@ type Props = {
 
 export function SettingsView({
   section,
+  anchor = null,
   cwd,
   sessions,
   besideRail = false,
@@ -222,19 +244,26 @@ export function SettingsView({
   onOpenWhatsNew,
 }: Props) {
   const lockOverscroll = useLockOverscroll<HTMLDivElement>();
+  useEffect(() => {
+    if (!anchor) return;
+    document.getElementById(ANCHOR_IDS[anchor])?.scrollIntoView({
+      block: "start",
+    });
+  }, [anchor]);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   const appearance = useAppearanceSettings();
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
+      if (event.key !== "Escape" || event.defaultPrevented) return;
       event.preventDefault();
       event.stopPropagation();
       onCloseRef.current();
     };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
+    // Let dialogs and other Settings controls handle Escape first.
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   return (
@@ -272,37 +301,50 @@ export function SettingsView({
         {IS_MAC ? null : <WindowControls />}
       </div>
 
-      <div
-        ref={lockOverscroll}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-none"
-      >
-        <div className="mx-auto w-full max-w-5xl px-8 py-8">
-          <PageHeader
-            title={settingsSectionLabel(section)}
-            description={settingsSectionDescription(section)}
-          />
-          {section === "general" ? (
-            <GeneralPage onOpenWhatsNew={onOpenWhatsNew} />
-          ) : null}
-          {section === "appearance" ? (
-            <AppearancePage appearance={appearance} />
-          ) : null}
-          {section === "keybindings" ? <KeybindingsPage /> : null}
-          {section === "providers" ? <ProvidersPage /> : null}
-          {section === "skills" ? <SkillsPage key={cwd} cwd={cwd} /> : null}
-          {section === "archive" ? (
-            <ArchivePage
-              cwd={cwd}
-              sessions={sessions}
-              onOpenSession={onOpenSession}
-              onArchiveSession={onArchiveSession}
-              onDeleteSession={onDeleteSession}
-              onRestoreProject={onRestoreProject}
-              onDeleteProject={onDeleteProject}
+      {section === "skills" ? (
+        <SkillsPage
+          key={cwd}
+          cwd={cwd}
+          header={
+            <PageHeader
+              title={settingsSectionLabel(section)}
+              description={settingsSectionDescription(section)}
             />
-          ) : null}
+          }
+        />
+      ) : (
+        <div
+          ref={lockOverscroll}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-none"
+        >
+          <div className="mx-auto w-full max-w-5xl px-8 py-8">
+            <PageHeader
+              title={settingsSectionLabel(section)}
+              description={settingsSectionDescription(section)}
+            />
+            {section === "general" ? (
+              <GeneralPage onOpenWhatsNew={onOpenWhatsNew} />
+            ) : null}
+            {section === "appearance" ? (
+              <AppearancePage appearance={appearance} />
+            ) : null}
+            {section === "keybindings" ? <KeybindingsPage /> : null}
+            {section === "providers" ? <ProvidersPage /> : null}
+            {section === "inbox" ? <InboxPage /> : null}
+            {section === "archive" ? (
+              <ArchivePage
+                cwd={cwd}
+                sessions={sessions}
+                onOpenSession={onOpenSession}
+                onArchiveSession={onArchiveSession}
+                onDeleteSession={onDeleteSession}
+                onRestoreProject={onRestoreProject}
+                onDeleteProject={onDeleteProject}
+              />
+            ) : null}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -319,6 +361,9 @@ function GeneralPage({
   const [diffViewer, setDiffViewer] = useState<DiffViewer>(loadDiffViewer);
   const [followUpBehavior, setFollowUpBehavior] =
     useState<FollowUpBehavior>(loadFollowUpBehavior);
+  const [composerEffortVisible, setComposerEffortVisible] = useState(
+    loadComposerEffortVisible,
+  );
   const [composerRunner, setComposerRunner] = useState(loadComposerRunner);
   const [gridArcadeEnabled, setGridArcadeEnabled] = useState(
     loadGridArcadeEnabled,
@@ -375,6 +420,11 @@ function GeneralPage({
   const onFollowUpBehavior = (next: FollowUpBehavior) => {
     saveFollowUpBehavior(next);
     setFollowUpBehavior(next);
+  };
+
+  const onComposerEffortVisible = (next: boolean) => {
+    saveComposerEffortVisible(next);
+    setComposerEffortVisible(next);
   };
 
   const onComposerRunner = (next: boolean) => {
@@ -469,6 +519,16 @@ function GeneralPage({
         />
       </Row>
       <Row
+        label="Effort control"
+        description="Show the current effort as a separate control beside the model picker for quicker changes. When off, effort stays inside the model menu."
+      >
+        <Toggle
+          label="Show effort beside model picker"
+          on={composerEffortVisible}
+          onChange={onComposerEffortVisible}
+        />
+      </Row>
+      <Row
         label="Composer mascot"
         description="When a turn is running, the project mascot runs along the composer, bonks the scroll-to-latest button the first time, then jumps it, and sometimes grabs a coin."
       >
@@ -512,7 +572,7 @@ function GeneralPage({
       </Row>
       <Row
         label="Notifications"
-        description="Notify when an agent finishes or needs input in another session or while MonoCode is in the background. Click the notification to open that session."
+        description="Notify when a reminder is due, or when an agent finishes or needs input in another session or while MonoCode is in the background. Click the notification to open that session."
       >
         {notificationsEnabled && notificationPermission === "denied" ? (
           <NotificationsBlocked />
@@ -539,14 +599,97 @@ function GeneralPage({
         />
       </Row>
 
-      <Heading title="GitLab" />
-      <GitlabSettings />
-
-      <Heading title="Linear" />
-      <LinearSettings />
-
       <Heading title="About" />
       <UpdateRow onOpenWhatsNew={onOpenWhatsNew} />
+    </>
+  );
+}
+
+function InboxPage() {
+  return (
+    <>
+      <Heading title="GitHub" id={ANCHOR_IDS.github} first />
+      <GithubSettings />
+
+      <Heading title="GitLab" id={ANCHOR_IDS.gitlab} />
+      <GitlabSettings />
+
+      <Heading title="Linear" id={ANCHOR_IDS.linear} />
+      <LinearSettings />
+    </>
+  );
+}
+
+function GithubSettings() {
+  const [status, setStatus] = useState<GithubStatus | null>(null);
+  const [checking, setChecking] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const request = useRef(0);
+
+  const checkStatus = useCallback(async () => {
+    const generation = ++request.current;
+    setChecking(true);
+    setError(null);
+    try {
+      const next = await githubStatus();
+      if (generation === request.current) setStatus(next);
+    } catch (err: unknown) {
+      if (generation === request.current) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    } finally {
+      if (generation === request.current) setChecking(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void checkStatus();
+    return () => {
+      request.current += 1;
+    };
+  }, [checkStatus]);
+
+  const description = status?.connected
+    ? "GitHub CLI is installed and authenticated. MonoCode uses it for GitHub inbox items."
+    : status?.installed
+      ? "Run gh auth login in a terminal, complete the sign-in flow, then check again."
+      : "Install GitHub CLI from cli.github.com, run gh auth login in a terminal, then check again.";
+  const label = checking
+    ? "Checking"
+    : status?.connected
+      ? "Connected"
+      : status?.installed
+        ? "Sign in required"
+        : "Not installed";
+
+  return (
+    <>
+      <Row
+        label={
+          <span className="flex items-center gap-2">
+            <InboxProviderMark provider="github" className="size-4 shrink-0" />
+            Connection
+          </span>
+        }
+        description={description}
+      >
+        <span className="text-[12px] text-content/50">{label}</span>
+        {!checking && !status?.installed ? (
+          <SecondaryButton
+            onClick={() => {
+              void openUrl("https://cli.github.com/").catch(() => {});
+            }}
+          >
+            Installation guide
+          </SecondaryButton>
+        ) : null}
+        <SecondaryButton onClick={() => void checkStatus()} disabled={checking}>
+          {checking ? "Checking" : "Check again"}
+        </SecondaryButton>
+      </Row>
+      {error ? (
+        <p className="pb-2 text-[12px] text-red-400/90">{error}</p>
+      ) : null}
     </>
   );
 }
@@ -934,9 +1077,11 @@ function useAppearanceSettings() {
   const [chatBackgroundPath, setChatBackgroundPath] = useState(
     loadChatBackgroundPath,
   );
-  const [chatBackgroundOpacity, setChatBackgroundOpacity] = useState(
-    loadChatBackgroundOpacity,
+  const [chatBackgroundEmptyOpacity, setChatBackgroundEmptyOpacity] = useState(
+    loadChatBackgroundEmptyOpacity,
   );
+  const [chatBackgroundSessionOpacity, setChatBackgroundSessionOpacity] =
+    useState(loadChatBackgroundSessionOpacity);
   const [chatBackgroundScope, setChatBackgroundScope] =
     useState<ChatBackgroundScope>(loadChatBackgroundScope);
   const [chatBackgroundBusy, setChatBackgroundBusy] = useState(false);
@@ -1014,10 +1159,16 @@ function useAppearanceSettings() {
     }
   }, []);
 
-  const onChatBackgroundOpacity = useCallback((percent: number) => {
-    const next = applyChatBackgroundOpacity(percent / 100);
-    saveChatBackgroundOpacity(next);
-    setChatBackgroundOpacity(next);
+  const onChatBackgroundEmptyOpacity = useCallback((percent: number) => {
+    const next = applyChatBackgroundEmptyOpacity(percent / 100);
+    saveChatBackgroundEmptyOpacity(next);
+    setChatBackgroundEmptyOpacity(next);
+  }, []);
+
+  const onChatBackgroundSessionOpacity = useCallback((percent: number) => {
+    const next = applyChatBackgroundSessionOpacity(percent / 100);
+    saveChatBackgroundSessionOpacity(next);
+    setChatBackgroundSessionOpacity(next);
   }, []);
 
   const onChatBackgroundScope = useCallback((next: ChatBackgroundScope) => {
@@ -1038,7 +1189,12 @@ function useAppearanceSettings() {
     onBlur(SIDEBAR_BLUR_DEFAULT);
     onTint(THEME_HUE_DEFAULT, THEME_SATURATION_DEFAULT);
     onBodyGlass(BODY_GLASS_DEFAULT);
-    onChatBackgroundOpacity(Math.round(CHAT_BACKGROUND_OPACITY_DEFAULT * 100));
+    onChatBackgroundEmptyOpacity(
+      Math.round(CHAT_BACKGROUND_EMPTY_OPACITY_DEFAULT * 100),
+    );
+    onChatBackgroundSessionOpacity(
+      Math.round(CHAT_BACKGROUND_SESSION_OPACITY_DEFAULT * 100),
+    );
     onChatBackgroundScope(CHAT_BACKGROUND_SCOPE_DEFAULT);
     if (chatBackgroundPath) void onClearChatBackground();
     onUiScale(Math.round(UI_SCALE_DEFAULT * 100));
@@ -1046,7 +1202,8 @@ function useAppearanceSettings() {
     chatBackgroundPath,
     onBlur,
     onBodyGlass,
-    onChatBackgroundOpacity,
+    onChatBackgroundEmptyOpacity,
+    onChatBackgroundSessionOpacity,
     onChatBackgroundScope,
     onClearChatBackground,
     onThemePreference,
@@ -1063,7 +1220,8 @@ function useAppearanceSettings() {
     themeSaturation,
     bodyGlass,
     chatBackgroundPath,
-    chatBackgroundOpacity,
+    chatBackgroundEmptyOpacity,
+    chatBackgroundSessionOpacity,
     chatBackgroundScope,
     chatBackgroundBusy,
     chatBackgroundError,
@@ -1075,7 +1233,8 @@ function useAppearanceSettings() {
     onBodyGlass,
     onChooseChatBackground,
     onClearChatBackground,
-    onChatBackgroundOpacity,
+    onChatBackgroundEmptyOpacity,
+    onChatBackgroundSessionOpacity,
     onChatBackgroundScope,
     onUiScale,
     restoreDefaults,
@@ -1205,7 +1364,12 @@ function ChatBackgroundCard({
 }) {
   const src = chatBackgroundSrc(appearance.chatBackgroundPath);
   const hasImage = Boolean(appearance.chatBackgroundPath && src);
-  const visibility = Math.round(appearance.chatBackgroundOpacity * 100);
+  const emptyVisibility = Math.round(
+    appearance.chatBackgroundEmptyOpacity * 100,
+  );
+  const sessionVisibility = Math.round(
+    appearance.chatBackgroundSessionOpacity * 100,
+  );
   const busy = appearance.chatBackgroundBusy;
 
   return (
@@ -1249,10 +1413,10 @@ function ChatBackgroundCard({
               alt=""
               draggable={false}
               className="size-full object-cover"
-              style={{ opacity: appearance.chatBackgroundOpacity }}
+              style={{ opacity: appearance.chatBackgroundEmptyOpacity }}
             />
             <span className="pointer-events-none absolute bottom-2 left-2 text-[11px] text-content/40">
-              Preview at {visibility}%
+              Empty chat preview at {emptyVisibility}%
             </span>
           </div>
         ) : (
@@ -1291,18 +1455,38 @@ function ChatBackgroundCard({
             </div>
             <div className="flex items-center justify-between gap-4 border-t border-content/5 px-3 py-2.5">
               <div className="min-w-0">
-                <div className="text-[12px] text-content">Visibility</div>
+                <div className="text-[12px] text-content">
+                  Empty chat visibility
+                </div>
                 <p className="text-[11px] text-content/40">
-                  Keep it subtle so long conversations stay readable.
+                  Background strength before a chat has messages.
                 </p>
               </div>
               <Slider
-                label="Background visibility"
-                value={visibility}
-                display={`${visibility}%`}
+                label="Empty chat background visibility"
+                value={emptyVisibility}
+                display={`${emptyVisibility}%`}
                 min={Math.round(CHAT_BACKGROUND_OPACITY_MIN * 100)}
                 max={Math.round(CHAT_BACKGROUND_OPACITY_MAX * 100)}
-                onChange={appearance.onChatBackgroundOpacity}
+                onChange={appearance.onChatBackgroundEmptyOpacity}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-4 border-t border-content/5 px-3 py-2.5">
+              <div className="min-w-0">
+                <div className="text-[12px] text-content">
+                  Session visibility
+                </div>
+                <p className="text-[11px] text-content/40">
+                  Background strength once the conversation has messages.
+                </p>
+              </div>
+              <Slider
+                label="Session background visibility"
+                value={sessionVisibility}
+                display={`${sessionVisibility}%`}
+                min={Math.round(CHAT_BACKGROUND_OPACITY_MIN * 100)}
+                max={Math.round(CHAT_BACKGROUND_OPACITY_MAX * 100)}
+                onChange={appearance.onChatBackgroundSessionOpacity}
               />
             </div>
           </div>
@@ -1716,9 +1900,18 @@ function PageHeader({
   );
 }
 
-function Heading({ title, first = false }: { title: string; first?: boolean }) {
+function Heading({
+  title,
+  first = false,
+  id,
+}: {
+  title: string;
+  first?: boolean;
+  id?: string;
+}) {
   return (
     <h2
+      id={id}
       className={`pb-1 text-[15px] font-semibold text-content ${
         first ? "" : "pt-8"
       }`}
@@ -2035,14 +2228,9 @@ function Select({
                     : "text-content hover:bg-content/5"
                 }`}
               >
-                <span className="min-w-0 flex-1 truncate">
-                  {option.label}
-                </span>
+                <span className="min-w-0 flex-1 truncate">{option.label}</span>
                 {isSelected ? (
-                  <Check
-                    className="size-3.5 shrink-0"
-                    strokeWidth={2.25}
-                  />
+                  <Check className="size-3.5 shrink-0" strokeWidth={2.25} />
                 ) : null}
               </button>
             );
