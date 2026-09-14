@@ -425,6 +425,32 @@ describe("OMP persisted interjection repair", () => {
     const repaired = backfillOmpInterjections(blocks, [], source("Setup.", "Intro.", "First.Second."));
     expect(repaired.map(block => block.id)).toEqual(["complete", "a", "a-status"]);
   });
+
+  it("returns blocks unmerged when the alignment exceeds its budget", () => {
+    const chain = (count: number): Block[] => {
+      const blocks: Block[] = [];
+      for (let index = 0; index < count; index++) {
+        blocks.push({ id: `f${index}`, role: "assistant", text: `p${index}.` });
+        if (index + 1 < count) {
+          blocks.push({ id: `f${index}-status`, role: "system", text: "Reviewed" });
+        }
+      }
+      return blocks;
+    };
+    const joined = (count: number) =>
+      Array.from({ length: count }, (_, index) => `p${index}.`).join("");
+    // Control: a short chain of the same shape welds into one assistant block.
+    const merged = backfillOmpInterjections(chain(3), [], source(joined(3)));
+    expect(merged.map(block => [block.id, block.text])).toEqual([
+      ["f0", joined(3)], ["f0-status", "Reviewed"], ["f1-status", "Reviewed"],
+    ]);
+    // 2_500 fragments drive the recursive alignment past its depth budget;
+    // the persisted repair must fail closed, not weld by a weaker rule.
+    const deep = chain(2_500);
+    const result = backfillOmpInterjections(deep, [], source(joined(2_500)));
+    expect(result).toBe(deep);
+    expect(result).toEqual(deep);
+  });
 });
 
 describe("persisted session loading", () => {
