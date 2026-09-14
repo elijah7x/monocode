@@ -1144,7 +1144,7 @@ function SidebarComponent({
   const sidebarContent = (
     <aside
       ref={resize.setPaneRef}
-      className="sidebar-glass relative flex h-full min-h-0 shrink-0 flex-col border-r border-content/10"
+      className="body-glass relative flex h-full min-h-0 shrink-0 flex-col border-r border-content/10"
     >
       {railVisible ? (
         <>
@@ -1720,6 +1720,7 @@ function SidebarProjectPicker({
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const pickerRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const [groupLabels] = useState(loadTabGroupLabels);
   const [groupColors] = useState(loadTabGroupColors);
   const [groupCustomColors] = useState(loadTabGroupCustomColors);
@@ -1761,6 +1762,15 @@ function SidebarProjectPicker({
     setQuery("");
     setActive(0);
   };
+
+  useEffect(() => {
+    if (!open) return;
+    searchRef.current?.focus();
+    const frame = window.requestAnimationFrame(() => {
+      searchRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [open]);
 
   const pickProject = (path: string) => {
     closePicker();
@@ -1860,7 +1870,7 @@ function SidebarProjectPicker({
               <Search className="size-4 shrink-0" strokeWidth={1.75} />
               <span className="sr-only">Search projects</span>
               <input
-                autoFocus
+                ref={searchRef}
                 value={query}
                 onChange={(event) => {
                   setQuery(event.target.value);
@@ -2290,6 +2300,8 @@ function FolderRenameRow({
   );
 }
 
+const SESSION_PREFETCH_DELAY_MS = 120;
+
 function SessionCard({
   session,
   isActive,
@@ -2334,6 +2346,7 @@ function SessionCard({
   onDelete?: () => void;
 }) {
   const skipClickUntil = useRef(0);
+  const prefetchTimer = useRef<number | null>(null);
   const [dragging, setDragging] = useState(false);
   const title = sessionDisplayTitle(session.title, session.harness);
   const gitLabel = formatGitLabel(session.repo, session.branch);
@@ -2438,6 +2451,10 @@ function SessionCard({
     if (event.button !== 0) return;
     // Warm the transcript during the press. Opening stays on click so a
     // drag-to-pane gesture does not switch conversations.
+    if (prefetchTimer.current != null) {
+      window.clearTimeout(prefetchTimer.current);
+      prefetchTimer.current = null;
+    }
     onPrefetch?.(session.id);
     if (!onPlaceOnPane && !onListDrop) return;
     const handle = event.currentTarget;
@@ -2537,6 +2554,30 @@ function SessionCard({
     window.addEventListener("keydown", onKey);
   };
 
+  useEffect(
+    () => () => {
+      if (prefetchTimer.current != null) {
+        window.clearTimeout(prefetchTimer.current);
+        prefetchTimer.current = null;
+      }
+    },
+    [onPrefetch, session.id],
+  );
+
+  const schedulePrefetch = () => {
+    if (!onPrefetch || prefetchTimer.current != null) return;
+    prefetchTimer.current = window.setTimeout(() => {
+      prefetchTimer.current = null;
+      onPrefetch(session.id);
+    }, SESSION_PREFETCH_DELAY_MS);
+  };
+
+  const cancelScheduledPrefetch = () => {
+    if (prefetchTimer.current == null) return;
+    window.clearTimeout(prefetchTimer.current);
+    prefetchTimer.current = null;
+  };
+
   const archiveLabel = session.archived ? "Unarchive" : "Archive";
 
   return (
@@ -2551,7 +2592,8 @@ function SessionCard({
         data-session-selected={isSelected ? "true" : undefined}
         data-tauri-drag-region="false"
         onPointerDown={onPointerDown}
-        onPointerEnter={() => onPrefetch?.(session.id)}
+        onPointerEnter={schedulePrefetch}
+        onPointerLeave={cancelScheduledPrefetch}
         onClick={(event) => {
           if (performance.now() < skipClickUntil.current) return;
           onSelect(session.id, event);
