@@ -96,7 +96,8 @@ function beats(a: AlignmentScore, b: AlignmentScore): boolean {
  * themselves as real messages — including when the matching combined text is
  * a message the transcript simply never stored — and equal matches resolve
  * toward explaining earlier source slots. Anchors never authorize a merge.
- * Pathological inputs fall back to the cursor rule.
+ * Pathological inputs exceed the alignment budget and fail closed: the
+ * blocks are returned unmerged rather than welded by a weaker rule.
  */
 function mergeStatusSplits(blocks: Block[], source: readonly OmpAssistantText[]): Block[] {
   const limit = source.length;
@@ -212,39 +213,8 @@ function mergeStatusSplits(blocks: Block[], source: readonly OmpAssistantText[])
     }
     return repaired ?? blocks;
   } catch {
-    return mergeStatusSplitsLinear(blocks, source);
+    return blocks;
   }
-}
-
-/** Fallback when the full alignment exceeds its budget: weld only the first
- * fragment pair when its combined text is exactly the next unconsumed slot. */
-function mergeStatusSplitsLinear(blocks: Block[], source: readonly OmpAssistantText[]): Block[] {
-  const positions = sourcePositions(source);
-  const limit = source.length;
-  const nextSlot = (text: string, from: number) => slotAt(positions, text, from, limit);
-  const hop = chainHops(blocks);
-  let cursor = 0;
-  let repaired: Block[] | undefined;
-  for (let index = 0; index < blocks.length; index++) {
-    const first = blocks[index];
-    const end = hop[index] || undefined;
-    if (
-      end !== undefined && cursor < limit &&
-      nextSlot(first.text + blocks[end].text, cursor) === cursor
-    ) {
-      repaired ??= blocks.slice(0, index);
-      repaired.push({ ...first, text: first.text + blocks[end].text }, ...blocks.slice(index + 1, end));
-      cursor++;
-      index = end;
-      continue;
-    }
-    if (first.role === "assistant" && !first.streaming) {
-      const own = nextSlot(first.text, cursor);
-      if (own < limit) cursor = own + 1;
-    }
-    repaired?.push(first);
-  }
-  return repaired ?? blocks;
 }
 
 /** Restore omitted boundaries, not turns: live interjections also stay mid-turn.
