@@ -120,37 +120,35 @@ describe("EffortMeter", () => {
   it("only offers reset away from the default", () => {
     const onChange = vi.fn();
     renderMeter({ value: "high", onChange });
-    expect(
-      container.querySelector('button[aria-label="Reset to default"]'),
-    ).toBeNull();
+    const resetDefault = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Reset to default"]',
+    )!;
+    expect(resetDefault.style.visibility).toBe("hidden");
 
     renderMeter({ value: "xhigh", onChange });
     const reset = container.querySelector<HTMLButtonElement>(
       'button[aria-label="Reset to default"]',
     )!;
-    expect(reset).not.toBeNull();
+    expect(reset.style.visibility).toBe("visible");
     act(() => reset.click());
     expect(onChange).toHaveBeenCalledWith("high");
   });
 
   it("marks the fill as top tier only at the last tier", () => {
     renderMeter({ value: "xhigh" });
-    expect(
-      container.querySelector(".effort-rail-fill[data-top-tier]"),
-    ).not.toBeNull();
+    expect(container.querySelector("[data-top-tier]")).not.toBeNull();
 
     renderMeter({ value: "medium" });
-    expect(
-      container.querySelector(".effort-rail-fill[data-top-tier]"),
-    ).toBeNull();
+    expect(container.querySelector("[data-top-tier]")).toBeNull();
   });
 
   it("sizes the fill to the selected tier's fraction of the rail", () => {
     renderMeter({ value: "medium" });
+    const rail = container.querySelector<HTMLElement>(".effort-rail")!;
     const fill = container.querySelector<HTMLElement>(".effort-rail-fill")!;
     // "medium" is index 1 of 4 tiers → one third of the rail.
-    expect(fill.style.width).toContain("%");
-    expect(Number.parseFloat(fill.style.width)).toBeCloseTo(33.3, 1);
+    expect(rail.style.getPropertyValue("--effort-frac")).toContain("0.333");
+    expect(fill.style.width).toContain("--effort-frac");
   });
 
   it("closes on Enter", () => {
