@@ -572,6 +572,14 @@ function AgentTranscriptComponent({
                               offset === foldWork.length - 1
                                 ? "zen-fold-tail"
                                 : ""
+                            }${
+                              // Prose the trail holds is the agent talking
+                              // while it works; the marker lets it read as
+                              // process, not result.
+                              entry.type === "block" &&
+                              isProseBlock(entry.block)
+                                ? " zen-fold-prose"
+                                : ""
                             }`}
                           >
                             {renderItem(entry, index)}
