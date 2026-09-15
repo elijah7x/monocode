@@ -133,12 +133,24 @@ describe("EffortMeter", () => {
     expect(onChange).toHaveBeenCalledWith("high");
   });
 
-  it("marks the peak bar as top tier only at the last tier", () => {
+  it("marks the fill as top tier only at the last tier", () => {
     renderMeter({ value: "xhigh" });
-    expect(container.querySelector("rect[data-top-tier]")).not.toBeNull();
+    expect(
+      container.querySelector(".effort-rail-fill[data-top-tier]"),
+    ).not.toBeNull();
 
     renderMeter({ value: "medium" });
-    expect(container.querySelector("rect[data-top-tier]")).toBeNull();
+    expect(
+      container.querySelector(".effort-rail-fill[data-top-tier]"),
+    ).toBeNull();
+  });
+
+  it("sizes the fill to the selected tier's fraction of the rail", () => {
+    renderMeter({ value: "medium" });
+    const fill = container.querySelector<HTMLElement>(".effort-rail-fill")!;
+    // "medium" is index 1 of 4 tiers → one third of the rail.
+    expect(fill.style.width).toContain("%");
+    expect(Number.parseFloat(fill.style.width)).toBeCloseTo(33.3, 1);
   });
 
   it("closes on Enter", () => {

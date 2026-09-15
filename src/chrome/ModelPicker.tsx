@@ -41,7 +41,7 @@ import { LAYER } from "../lib/layers";
 import { HarnessIcon } from "./HarnessIcon";
 import {
   EffortMeter,
-  EffortMeterBars,
+  EffortMeterSpark,
   orderEffortOptions,
 } from "./EffortMeter";
 import { Popover } from "./Popover";
@@ -890,11 +890,11 @@ export function EffortPicker({
             : "bg-content/10 text-content hover:bg-content/15"
         }`}
       >
-        <EffortMeterBars
+        <EffortMeterSpark
           tiers={tiers}
           selectedIndex={selectedIndex}
           size="mini"
-          className="h-2.5 w-auto shrink-0"
+          className="shrink-0"
         />
         <span className="min-w-0 truncate text-[11px]">{valueLabel}</span>
         <ChevronDown
