@@ -1448,20 +1448,11 @@ html.has-user-accent {
   max-width: calc(100vw - 24px);
 }
 
-/* Keyboard focus stays visible without drawing a frame around the track:
-   the thumb picks up a faint keyline instead. */
-.effort-slider:focus-visible .effort-thumb-inner {
-  box-shadow:
-    0 0 0 1px rgb(0 0 0 / 16%),
-    0 0 0 3px color-mix(in srgb, var(--color-content) 28%, transparent),
-    0 1px 3px rgb(0 0 0 / 24%);
-}
-
-html.theme-light .effort-slider:focus-visible .effort-thumb-inner {
-  box-shadow:
-    0 0 0 1px rgb(0 0 0 / 8%),
-    0 0 0 3px color-mix(in srgb, var(--color-content) 30%, transparent),
-    0 1px 3px rgb(0 0 0 / 12%);
+/* WKWebView paints the platform focus ring on :focus for any focusable
+   element regardless of pointer source; suppress it and keep only the
+   thumb keyline for real keyboard focus. */
+.effort-slider:focus {
+  outline: none;
 }
 
 .effort-rail {
@@ -1492,30 +1483,31 @@ html.theme-light .effort-rail {
   height: 100%;
   border-radius: 11px;
   overflow: hidden;
-  /* Brightness climbs toward the leading edge: a third stop keeps the
-     gradient lifting instead of plateauing mid-rail. */
+  clip-path: inset(0 calc(100% - var(--effort-frac)) 0 0);
   background: linear-gradient(
     90deg,
-    color-mix(in srgb, var(--color-content) 22%, transparent) 0%,
-    color-mix(in srgb, var(--color-content) 38%, transparent) 55%,
-    color-mix(in srgb, var(--color-content) 55%, transparent) 100%
+    color-mix(in srgb, var(--color-content) 16%, transparent) 0%,
+    color-mix(in srgb, var(--color-content) 32%, transparent) 55%,
+    color-mix(in srgb, var(--color-content) 52%, transparent) 100%
   );
   box-shadow: none;
-  transition: width 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: clip-path var(--effort-settle-ms, 140ms)
+    cubic-bezier(0.22, 0.75, 0.18, 1);
 }
 
 html.theme-light .effort-rail-fill {
   background: linear-gradient(
     90deg,
-    color-mix(in srgb, var(--color-content) 16%, transparent) 0%,
-    color-mix(in srgb, var(--color-content) 26%, transparent) 55%,
-    color-mix(in srgb, var(--color-content) 38%, transparent) 100%
+    color-mix(in srgb, var(--color-content) 14%, transparent) 0%,
+    color-mix(in srgb, var(--color-content) 24%, transparent) 55%,
+    color-mix(in srgb, var(--color-content) 36%, transparent) 100%
   );
   box-shadow: none;
 }
 
 .effort-rail-mini .effort-rail-fill {
   inset: 0;
+  clip-path: none;
   height: 100%;
   border-radius: 5px;
   background: linear-gradient(
@@ -1536,24 +1528,25 @@ html.theme-light .effort-rail-fill {
   );
 }
 
-[data-dragging] .effort-rail-fill,
-[data-dragging] .effort-thumb,
-[data-dragging] .effort-specks,
-[data-dragging] .effort-specks-highlight {
-  transition: none !important;
+/* Position is sampled once in rAF for every layer, including settle.
+   CSS transitions remain for standalone rails, never double-ease samples. */
+[data-sampled] .effort-rail-fill,
+[data-sampled] .effort-thumb,
+[data-sampled] .effort-specks,
+[data-sampled] .effort-ticks {
+  transition: none;
 }
 
 .effort-top-tint {
   position: absolute;
-  inset: 0;
+  inset: 0 0 0 auto;
+  width: 28px;
   border-radius: inherit;
   pointer-events: none;
   background: linear-gradient(
     90deg,
     transparent 0%,
-    transparent 62%,
-    color-mix(in srgb, var(--effort-accent) 8%, transparent) 78%,
-    color-mix(in srgb, var(--effort-accent) 24%, transparent) 100%
+    color-mix(in srgb, var(--effort-accent) 12%, transparent) 100%
   );
   box-shadow: none;
   opacity: 0;
@@ -1569,11 +1562,12 @@ html.theme-light .effort-rail-fill {
   top: 50%;
   left: var(--effort-frac);
   transform: translate(-50%, -50%);
-  width: 24px;
-  height: 24px;
+  width: var(--effort-thumb, 27px);
+  height: var(--effort-thumb, 27px);
   pointer-events: none;
   z-index: 2;
-  transition: left 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: left var(--effort-settle-ms, 140ms)
+    cubic-bezier(0.22, 0.75, 0.18, 1);
 }
 
 .effort-thumb-inner {
@@ -1585,10 +1579,11 @@ html.theme-light .effort-rail-fill {
   box-shadow:
     0 0 0 1px rgb(0 0 0 / 16%),
     0 1px 3px rgb(0 0 0 / 24%);
-  transform: scale(1);
+  transform: scale(var(--effort-sx, 1), var(--effort-sy, 1));
+  transform-origin: var(--effort-origin, 50%) 50%;
   transition:
-    transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 160ms ease-out;
+    transform 150ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 100ms ease-out;
 }
 
 html.theme-light .effort-thumb-inner {
@@ -1599,41 +1594,87 @@ html.theme-light .effort-thumb-inner {
 }
 
 [data-pressed] .effort-thumb-inner {
-  transform: scale(0.96);
-  transition: transform 80ms cubic-bezier(0.2, 0, 0, 1);
+  transition: box-shadow 100ms ease-out;
 }
 
-.effort-slider:has([data-top-tier]) .effort-thumb-inner,
 .effort-rail:has([data-top-tier]) .effort-thumb-inner {
+  box-shadow: 0 0 10px -1px
+    color-mix(in srgb, var(--effort-accent) 26%, transparent);
+  transition:
+    transform 150ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 180ms ease-out;
+}
+
+[data-pressed] .effort-rail:has([data-top-tier]) .effort-thumb-inner {
+  transition: box-shadow 180ms ease-out;
+}
+
+/* Keyboard focus stays visible without drawing a frame around the track:
+   the thumb picks up a faint keyline instead. */
+.effort-slider:focus-visible .effort-thumb-inner {
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--effort-accent) 50%, transparent),
-    0 0 10px -1px color-mix(in srgb, var(--effort-accent) 45%, transparent),
+    0 0 0 1px rgb(0 0 0 / 16%),
+    0 0 0 3px color-mix(in srgb, var(--color-content) 28%, transparent),
     0 1px 3px rgb(0 0 0 / 24%);
+}
+
+html.theme-light .effort-slider:focus-visible .effort-thumb-inner {
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 8%),
+    0 0 0 3px color-mix(in srgb, var(--color-content) 30%, transparent),
+    0 1px 3px rgb(0 0 0 / 12%);
+}
+
+.effort-ticks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  -webkit-mask-image: radial-gradient(
+    circle 15px at var(--effort-frac) 50%,
+    transparent 13px,
+    #000 16px
+  );
+  mask-image: radial-gradient(
+    circle 15px at var(--effort-frac) 50%,
+    transparent 13px,
+    #000 16px
+  );
+  transition: mask-image var(--effort-settle-ms, 140ms)
+    cubic-bezier(0.22, 0.75, 0.18, 1);
 }
 
 .effort-rail-tick {
   position: absolute;
   top: 50%;
   width: 1px;
-  height: 6px;
+  height: 3px;
   transform: translate(-50%, -50%);
   border-radius: 0.5px;
-  background: color-mix(in srgb, var(--color-content) 22%, transparent);
+  background: color-mix(in srgb, var(--color-content) 16%, transparent);
   pointer-events: none;
   z-index: 1;
 }
 
 .effort-rail-tick[data-passed] {
-  background: color-mix(in srgb, var(--color-content) 32%, transparent);
+  background: rgb(255 255 255 / 20%);
 }
 
-.effort-rail-tick[data-auto] {
-  width: 4px;
-  height: 4px;
+html.theme-light .effort-rail-tick {
+  background: color-mix(in srgb, var(--color-content) 18%, transparent);
+}
+
+html.theme-light .effort-rail-tick[data-passed] {
+  background: color-mix(in srgb, var(--color-content) 23%, transparent);
+}
+
+.effort-rail-tick[data-auto],
+html.theme-light .effort-rail-tick[data-auto] {
+  width: 3px;
+  height: 3px;
   border-radius: 50%;
   background: transparent;
   box-shadow: inset 0 0 0 1px
-    color-mix(in srgb, var(--color-content) 38%, transparent);
+    color-mix(in srgb, var(--color-content) 28%, transparent);
 }
 
 .effort-specks {
@@ -1641,19 +1682,13 @@ html.theme-light .effort-thumb-inner {
   inset: 0;
   pointer-events: none;
   clip-path: inset(0 calc(100% - var(--effort-frac)) 0 0);
-  /* The field itself intensifies with effort: dim embers at low, hot at high. */
-  opacity: calc(0.62 + 0.38 * var(--effort-t, 0));
-  transition:
-    clip-path 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    opacity 180ms ease-out;
+  opacity: calc(0.72 + 0.28 * var(--effort-t, 0));
+  transition: clip-path var(--effort-settle-ms, 140ms)
+    cubic-bezier(0.22, 0.75, 0.18, 1);
 }
 
 .effort-rail-mini .effort-specks {
   transition: none;
-}
-
-html.theme-light .effort-specks {
-  opacity: calc((0.62 + 0.38 * var(--effort-t, 0)) * 0.85);
 }
 
 .effort-specks-highlight {
@@ -1661,35 +1696,30 @@ html.theme-light .effort-specks {
   inset: 0;
   pointer-events: none;
   clip-path: inset(0 calc(100% - var(--effort-frac)) 0 0);
-  opacity: 0;
+  opacity: var(--effort-light, 0);
   -webkit-mask-image: linear-gradient(
     90deg,
-    transparent,
-    #000 67%,
-    transparent
+    transparent 0%,
+    #000 70%,
+    transparent 100%
   );
-  -webkit-mask-size: 36px 100%;
+  -webkit-mask-size: 54px 100%;
   -webkit-mask-repeat: no-repeat;
-  -webkit-mask-position: calc(var(--effort-frac) - 40px) 0;
-  mask-image: linear-gradient(90deg, transparent, #000 67%, transparent);
-  mask-size: 36px 100%;
+  -webkit-mask-position: calc(var(--effort-frac) - 46px) 0;
+  mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    #000 70%,
+    transparent 100%
+  );
+  mask-size: 54px 100%;
   mask-repeat: no-repeat;
-  mask-position: calc(var(--effort-frac) - 40px) 0;
-  transition:
-    clip-path 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    mask-position 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    -webkit-mask-position 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    opacity 180ms ease-out;
+  mask-position: calc(var(--effort-frac) - 46px) 0;
+  transition: opacity 150ms linear;
 }
 
-[data-pressed] .effort-specks-highlight,
-[data-dragging] .effort-specks-highlight {
-  opacity: 1;
-  transition:
-    clip-path 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    mask-position 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    -webkit-mask-position 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    opacity 80ms ease-in;
+[data-pressed] .effort-specks-highlight {
+  transition: none;
 }
 
 .effort-specks-highlight .effort-speck-inner {
@@ -1714,92 +1744,36 @@ html.theme-light .effort-specks-highlight .effort-speck-inner {
   border-radius: 50%;
   background: #ffffff;
   opacity: var(--speck-base);
+  --speck-scale: 1;
+}
+
+html.theme-light .effort-speck-inner {
+  --speck-scale: 1.15;
+  opacity: min(0.48, calc(var(--speck-base) * var(--speck-scale)));
 }
 
 .effort-speck[data-glow] .effort-speck-inner {
-  box-shadow: 0 0 2px rgb(255 255 255 / 16%);
+  box-shadow: 0 0 3px 0.5px rgb(255 255 255 / 38%);
 }
 
-.effort-speck[data-twinkle="echo"] .effort-speck-inner {
-  animation: effort-twinkle var(--speck-duration)
-    cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
+html.theme-light .effort-speck[data-glow] .effort-speck-inner {
+  box-shadow: 0 0 3px 0.5px rgb(0 0 0 / 20%);
+}
+
+.effort-speck[data-twinkle] .effort-speck-inner {
+  animation: effort-twinkle var(--speck-duration) ease-in-out infinite;
   animation-delay: var(--speck-delay);
-}
-
-.effort-speck[data-twinkle="no-echo"] .effort-speck-inner {
-  animation: effort-twinkle-no-echo var(--speck-duration)
-    cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
-  animation-delay: var(--speck-delay);
-}
-
-.effort-speck[data-drift="1"] {
-  animation: effort-drift-1 var(--drift-duration) ease-in-out infinite;
-}
-
-.effort-speck[data-drift="2"] {
-  animation: effort-drift-2 var(--drift-duration) ease-in-out infinite;
 }
 
 @keyframes effort-twinkle {
   0%,
   57%,
+  78%,
   100% {
-    opacity: var(--speck-base);
-    transform: scale(0.85);
+    opacity: min(0.48, calc(var(--speck-base) * var(--speck-scale)));
   }
-  64% {
-    opacity: var(--speck-peak);
-    transform: scale(1);
-  }
-  72% {
-    opacity: var(--speck-base);
-    transform: scale(0.9);
-  }
-  77% {
-    opacity: var(--speck-echo);
-    transform: scale(0.95);
-  }
-  88% {
-    opacity: var(--speck-base);
-    transform: scale(0.85);
-  }
-}
-
-@keyframes effort-twinkle-no-echo {
-  0%,
-  57%,
-  100% {
-    opacity: var(--speck-base);
-    transform: scale(0.85);
-  }
-  64% {
-    opacity: var(--speck-peak);
-    transform: scale(1);
-  }
-  72%,
-  100% {
-    opacity: var(--speck-base);
-    transform: scale(0.85);
-  }
-}
-
-@keyframes effort-drift-1 {
-  0%,
-  100% {
-    transform: translate(-50%, -50%);
-  }
-  50% {
-    transform: translate(calc(-50% + 1.5px), calc(-50% - 0.75px));
-  }
-}
-
-@keyframes effort-drift-2 {
-  0%,
-  100% {
-    transform: translate(-50%, -50%);
-  }
-  50% {
-    transform: translate(calc(-50% - 1.5px), calc(-50% + 0.75px));
+  66% {
+    opacity: min(0.48, calc(var(--speck-peak) * var(--speck-scale)));
   }
 }
 
@@ -1816,6 +1790,7 @@ html.theme-light .effort-specks-highlight .effort-speck-inner {
   .effort-thumb,
   .effort-thumb-inner,
   .effort-specks,
+  .effort-ticks,
   .effort-top-tint {
     transition: none !important;
     animation: none !important;
@@ -1836,7 +1811,7 @@ html.theme-light .effort-specks-highlight .effort-speck-inner {
 
   .effort-speck-inner {
     transform: none !important;
-    opacity: var(--speck-base) !important;
+    opacity: min(0.48, calc(var(--speck-base) * var(--speck-scale))) !important;
   }
 }
 
