@@ -246,12 +246,12 @@ describe("model picker", () => {
     expect(effortTrigger.textContent).toBe("High");
     expect(effortTrigger.querySelector("svg")).not.toBeNull();
     act(() => effortTrigger.click());
-    const effortMenu = container.querySelector<HTMLElement>(
-      '[role="menu"][aria-label="Effort"]',
+    const effortSlider = container.querySelector<HTMLElement>(
+      '[role="slider"][aria-label="Effort"]',
     )!;
-    expect(effortMenu).not.toBeNull();
-    keyDown(effortMenu, "ArrowUp");
-    keyDown(effortMenu, "Enter");
+    expect(effortSlider).not.toBeNull();
+    expect(effortSlider.getAttribute("aria-valuetext")).toBe("High");
+    keyDown(effortSlider, "ArrowRight");
     expect(onSettingsChange).toHaveBeenCalledWith({ effort: "xhigh" });
   });
 

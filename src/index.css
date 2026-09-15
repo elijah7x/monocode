@@ -1434,6 +1434,52 @@ html.theme-light .popover-backdrop {
   }
 }
 
+/* Effort meter: bars light up to the selected tier and the peak bar
+   breathes like the thinking line. The top tier takes the accent — the
+   default, or the user's when one is configured. */
+:root {
+  --effort-accent: var(--color-accent);
+}
+
+html.has-user-accent {
+  --effort-accent: var(--user-accent-color);
+}
+
+.effort-meter-bar {
+  transition: opacity var(--motion-feedback-duration) var(--motion-ease-out);
+}
+
+@keyframes effort-meter-breathe {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.effort-meter-peak {
+  animation: effort-meter-breathe 1.8s ease-in-out infinite;
+}
+
+.effort-meter-bar[data-top-tier] {
+  fill: var(--effort-accent);
+  opacity: 1;
+  filter: drop-shadow(0 0 4px var(--effort-accent));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .effort-meter-peak {
+    animation: none;
+    opacity: 1;
+  }
+
+  .effort-meter-bar {
+    transition: none;
+  }
+}
+
 /* Graph node cutouts so lane strokes do not show through the circles. */
 .git-history-item svg {
   display: block;
