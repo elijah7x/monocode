@@ -136,19 +136,45 @@ describe("EffortMeter", () => {
 
   it("marks the fill as top tier only at the last tier", () => {
     renderMeter({ value: "xhigh" });
-    expect(container.querySelector("[data-top-tier]")).not.toBeNull();
+    expect(container.querySelector(".effort-top-halo")).toBeNull();
+    expect(
+      container.querySelector(".effort-top-tint[data-top-tier]"),
+    ).not.toBeNull();
 
     renderMeter({ value: "medium" });
     expect(container.querySelector("[data-top-tier]")).toBeNull();
   });
 
   it("sizes the fill to the selected tier's fraction of the rail", () => {
-    renderMeter({ value: "medium" });
+    const slider = renderMeter({ value: "medium" });
     const rail = container.querySelector<HTMLElement>(".effort-rail")!;
     const fill = container.querySelector<HTMLElement>(".effort-rail-fill")!;
     // "medium" is index 1 of 4 tiers → one third of the rail.
     expect(rail.style.getPropertyValue("--effort-frac")).toContain("0.333");
     expect(fill.style.width).toContain("--effort-frac");
+
+    expect(container.querySelector(".effort-specks-highlight")).not.toBeNull();
+    expect(slider.hasAttribute("data-pressed")).toBe(false);
+    act(() => {
+      slider.dispatchEvent(
+        new PointerEvent("pointerdown", {
+          clientX: 50,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    });
+    expect(slider.hasAttribute("data-pressed")).toBe(true);
+    act(() => {
+      slider.dispatchEvent(
+        new PointerEvent("pointerup", {
+          clientX: 50,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    });
+    expect(slider.hasAttribute("data-pressed")).toBe(false);
   });
 
   it("closes on Enter", () => {
