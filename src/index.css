@@ -1434,10 +1434,8 @@ html.theme-light .popover-backdrop {
   }
 }
 
-/* Effort meter: a continuous rail that brightens toward the selected tier.
-   Tick marks keep the discreteness visible and specks twinkle inside the
-   fill. The top tier takes the accent — the default, or the user's when one
-   is configured. */
+/* Effort meter: recessed carved track with separate thumb, continuous drag,
+   discrete commit, deterministic quantum specks, and top-tier halo. */
 :root {
   --effort-accent: var(--color-accent);
 }
@@ -1446,139 +1444,431 @@ html.has-user-accent {
   --effort-accent: var(--user-accent-color);
 }
 
+[data-effort-picker] {
+  max-width: calc(100vw - 24px);
+  border-radius: 14px;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 5%),
+    0 0 0 1px rgb(255 255 255 / 8%),
+    0 4px 10px -4px rgb(0 0 0 / 24%),
+    0 16px 36px -12px rgb(0 0 0 / 40%);
+}
+
+html.theme-light [data-effort-picker] {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 80%),
+    0 0 0 1px rgb(0 0 0 / 7%),
+    0 3px 8px -3px rgb(0 0 0 / 10%),
+    0 14px 30px -10px rgb(0 0 0 / 16%);
+}
+
+.effort-slider:focus-visible .effort-rail {
+  outline: 1px solid color-mix(in srgb, var(--color-content) 55%, transparent);
+  outline-offset: 3px;
+  border-radius: 11px;
+}
+
 .effort-rail {
   position: relative;
-  height: 20px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-content) 10%, transparent);
-  overflow: hidden;
+  height: 22px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--color-content) 7%, transparent);
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 22%),
+    inset 0 0 0 1px color-mix(in srgb, var(--color-content) 5%, transparent),
+    0 1px 0 color-mix(in srgb, var(--color-content) 7%, transparent);
+}
+
+html.theme-light .effort-rail {
+  background: color-mix(in srgb, var(--color-content) 6%, transparent);
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 11%),
+    inset 0 0 0 1px color-mix(in srgb, var(--color-content) 4%, transparent),
+    0 1px 0 rgb(255 255 255 / 65%);
 }
 
 .effort-rail-mini {
   width: 34px;
   height: 10px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--color-content) 10%, transparent);
+  overflow: hidden;
+  box-shadow: none;
 }
 
 .effort-rail-fill {
   position: absolute;
-  inset: 0;
-  border-radius: 999px;
+  top: 1px;
+  bottom: 1px;
+  left: 1px;
+  height: 20px;
+  border-radius: 10px;
   overflow: hidden;
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--color-content) 30%, transparent),
-    color-mix(in srgb, var(--color-content) 75%, transparent)
-  );
-  transition: width var(--motion-feedback-duration) var(--motion-ease-out);
+  background:
+    linear-gradient(
+      180deg,
+      rgb(255 255 255 / 12%) 0%,
+      rgb(255 255 255 / 3%) 38%,
+      transparent 58%,
+      rgb(0 0 0 / 8%) 100%
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-content) 22%, transparent) 0%,
+      color-mix(in srgb, var(--color-content) 30%, transparent) 42%,
+      color-mix(in srgb, var(--color-content) 43%, transparent) 78%,
+      color-mix(in srgb, var(--color-content) 56%, transparent) 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 13%),
+    inset 0 -1px 0 rgb(0 0 0 / 10%);
+  transition: width 200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-[data-dragging] .effort-rail-fill {
-  transition: none;
+html.theme-light .effort-rail-fill {
+  background:
+    linear-gradient(
+      180deg,
+      rgb(255 255 255 / 24%) 0%,
+      rgb(255 255 255 / 6%) 38%,
+      transparent 58%,
+      rgb(0 0 0 / 4%) 100%
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-content) 14%, transparent) 0%,
+      color-mix(in srgb, var(--color-content) 19%, transparent) 42%,
+      color-mix(in srgb, var(--color-content) 27%, transparent) 78%,
+      color-mix(in srgb, var(--color-content) 35%, transparent) 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 30%),
+    inset 0 -1px 0 rgb(0 0 0 / 6%);
 }
 
-/* The fill's right edge is the knob: a brighter cap that breathes. */
-.effort-rail-fill::after {
-  content: "";
-  position: absolute;
+.effort-rail-mini .effort-rail-fill {
+  inset: 0;
   top: 0;
-  right: 0;
   bottom: 0;
-  width: 3px;
-  background: color-mix(in srgb, var(--color-content) 85%, transparent);
-  animation: effort-meter-breathe 1.8s ease-in-out infinite;
-}
-
-.effort-rail-mini .effort-rail-fill::after {
-  animation: none;
-}
-
-/* The track clips this to a glow trapped inside the rail. */
-.effort-rail-fill[data-top-tier] {
+  left: 0;
+  height: 100%;
+  border-radius: 5px;
   background: linear-gradient(
     90deg,
-    color-mix(in srgb, var(--color-content) 30%, transparent),
-    color-mix(in srgb, var(--effort-accent) 85%, transparent)
+    color-mix(in srgb, var(--color-content) 25%, transparent) 0%,
+    color-mix(in srgb, var(--color-content) 48%, transparent) 100%
   );
-  box-shadow: 0 0 10px color-mix(in srgb, var(--effort-accent) 60%, transparent);
+  box-shadow: none;
+  transition: width 200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .effort-rail-mini .effort-rail-fill[data-top-tier] {
-  box-shadow: none;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-content) 25%, transparent) 0%,
+    color-mix(in srgb, var(--color-content) 48%, transparent) 70%,
+    color-mix(in srgb, var(--effort-accent) 38%, transparent) 100%
+  );
+}
+
+[data-dragging] .effort-rail-fill,
+[data-dragging] .effort-thumb,
+[data-dragging] .effort-specks {
+  transition: none !important;
+}
+
+[data-releasing] .effort-rail-fill {
+  transition: width 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-releasing] .effort-thumb {
+  transition: left 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-releasing] .effort-specks {
+  transition: clip-path 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.effort-top-tint {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 62%,
+    color-mix(in srgb, var(--effort-accent) 10%, transparent) 76%,
+    color-mix(in srgb, var(--effort-accent) 28%, transparent) 90%,
+    color-mix(in srgb, var(--effort-accent) 48%, transparent) 100%
+  );
+  box-shadow:
+    inset -1px 0 2px color-mix(in srgb, var(--effort-accent) 32%, transparent),
+    inset -7px 0 12px -6px
+      color-mix(in srgb, var(--effort-accent) 24%, transparent);
+  opacity: 0;
+  transition: opacity 160ms ease-out;
+}
+
+.effort-top-tint[data-top-tier] {
+  opacity: 1;
+}
+
+.effort-top-halo {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 64px;
+  height: 30px;
+  transform: translateY(-50%);
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at 82% 50%,
+    color-mix(in srgb, var(--effort-accent) 12%, transparent) 0%,
+    color-mix(in srgb, var(--effort-accent) 5%, transparent) 42%,
+    transparent 74%
+  );
+  opacity: 0;
+  transition: opacity 160ms ease-out;
+}
+
+.effort-top-halo[data-active] {
+  opacity: 1;
+}
+
+html.theme-light .effort-top-halo {
+  background: radial-gradient(
+    ellipse at 82% 50%,
+    color-mix(in srgb, var(--effort-accent) 7%, transparent) 0%,
+    color-mix(in srgb, var(--effort-accent) 3%, transparent) 42%,
+    transparent 74%
+  );
+}
+
+.effort-thumb {
+  position: absolute;
+  top: 50%;
+  left: var(--effort-frac);
+  transform: translate(-50%, -50%);
+  width: 24px;
+  height: 24px;
+  pointer-events: none;
+  z-index: 2;
+  transition: left 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.effort-thumb-inner {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ffffff 0%, #eeeeef 100%);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 70%),
+    0 0 0 1px rgb(0 0 0 / 9%),
+    0 1px 2px rgb(0 0 0 / 18%),
+    0 3px 8px rgb(0 0 0 / 14%);
+}
+
+html.theme-light .effort-thumb-inner {
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 70%),
+    0 0 0 1px rgb(0 0 0 / 9%),
+    0 1px 2px rgb(0 0 0 / 12%),
+    0 3px 8px rgb(0 0 0 / 10%);
+}
+
+[data-pressed] .effort-thumb-inner {
+  transform: scale(0.94);
+  transition: transform 80ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+[data-releasing] .effort-thumb-inner {
+  animation: effort-thumb-release 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes effort-thumb-release {
+  0% {
+    transform: scale(0.94);
+  }
+  55% {
+    transform: scale(1.025);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .effort-rail-tick {
   position: absolute;
   top: 50%;
-  width: 1.5px;
-  height: 30%;
+  width: 1px;
+  height: 4px;
   transform: translate(-50%, -50%);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-content) 35%, transparent);
+  border-radius: 0.5px;
+  background: color-mix(in srgb, var(--color-content) 24%, transparent);
+  pointer-events: none;
+  z-index: 1;
 }
 
-/* Auto sits at index 0; a hollow ring distinguishes it from a real level. */
+.effort-rail-tick[data-passed] {
+  background: color-mix(in srgb, var(--color-content) 36%, transparent);
+}
+
 .effort-rail-tick[data-auto] {
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
   background: transparent;
   box-shadow: inset 0 0 0 1px
-    color-mix(in srgb, var(--color-content) 40%, transparent);
+    color-mix(in srgb, var(--color-content) 38%, transparent);
 }
 
 .effort-specks {
   position: absolute;
   inset: 0;
+  pointer-events: none;
+  clip-path: inset(0 calc(100% - var(--effort-frac)) 0 0);
+  transition: clip-path 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.effort-rail-mini .effort-specks {
+  transition: none;
+}
+
+html.theme-light .effort-specks {
+  opacity: 0.85;
 }
 
 .effort-speck {
   position: absolute;
-  width: 2px;
-  height: 2px;
-  border-radius: 999px;
   transform: translate(-50%, -50%);
-  background: var(--color-content);
-  opacity: 0;
-  animation: effort-speck 1.8s ease-in-out infinite;
+  pointer-events: none;
 }
 
-@keyframes effort-meter-breathe {
+.effort-speck-inner {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #ffffff;
+  opacity: var(--speck-base);
+}
+
+.effort-speck[data-glow] .effort-speck-inner {
+  box-shadow: 0 0 2px rgb(255 255 255 / 16%);
+}
+
+.effort-speck[data-twinkle="echo"] .effort-speck-inner {
+  animation: effort-twinkle var(--speck-duration)
+    cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
+  animation-delay: var(--speck-delay);
+}
+
+.effort-speck[data-twinkle="no-echo"] .effort-speck-inner {
+  animation: effort-twinkle-no-echo var(--speck-duration)
+    cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
+  animation-delay: var(--speck-delay);
+}
+
+.effort-speck[data-drift="1"] {
+  animation: effort-drift-1 var(--drift-duration) ease-in-out infinite;
+}
+
+.effort-speck[data-drift="2"] {
+  animation: effort-drift-2 var(--drift-duration) ease-in-out infinite;
+}
+
+@keyframes effort-twinkle {
+  0%,
+  57%,
+  100% {
+    opacity: var(--speck-base);
+    transform: scale(0.85);
+  }
+  64% {
+    opacity: var(--speck-peak);
+    transform: scale(1);
+  }
+  72% {
+    opacity: var(--speck-base);
+    transform: scale(0.9);
+  }
+  77% {
+    opacity: var(--speck-echo);
+    transform: scale(0.95);
+  }
+  88% {
+    opacity: var(--speck-base);
+    transform: scale(0.85);
+  }
+}
+
+@keyframes effort-twinkle-no-echo {
+  0%,
+  57%,
+  100% {
+    opacity: var(--speck-base);
+    transform: scale(0.85);
+  }
+  64% {
+    opacity: var(--speck-peak);
+    transform: scale(1);
+  }
+  72%,
+  100% {
+    opacity: var(--speck-base);
+    transform: scale(0.85);
+  }
+}
+
+@keyframes effort-drift-1 {
   0%,
   100% {
-    opacity: 0.7;
+    transform: translate(-50%, -50%);
   }
   50% {
-    opacity: 1;
+    transform: translate(calc(-50% + 1.5px), calc(-50% - 0.75px));
   }
 }
 
-@keyframes effort-speck {
+@keyframes effort-drift-2 {
   0%,
   100% {
-    opacity: 0;
+    transform: translate(-50%, -50%);
   }
   50% {
-    opacity: 0.8;
+    transform: translate(calc(-50% - 1.5px), calc(-50% + 0.75px));
   }
 }
 
-/* The chip should not twinkle in the toolbar. */
 .effort-rail-mini .effort-speck {
+  width: 1px;
+  height: 1px;
+  border-radius: 50%;
+  background: #ffffff;
   animation: none;
-  opacity: 0.35;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .effort-rail-fill {
-    transition: none;
+  .effort-rail-fill,
+  .effort-thumb,
+  .effort-thumb-inner,
+  .effort-specks,
+  .effort-top-tint,
+  .effort-top-halo {
+    transition: none !important;
+    animation: none !important;
   }
 
-  .effort-rail-fill::after {
-    animation: none;
+  .effort-speck,
+  .effort-speck-inner {
+    animation: none !important;
   }
 
-  .effort-speck {
-    animation: none;
-    opacity: 0.35;
+  .effort-speck-inner {
+    transform: none !important;
+    opacity: var(--speck-base) !important;
   }
 }
 
