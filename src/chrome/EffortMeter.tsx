@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { RotateCcw } from "./icons";
 
 export type EffortTier = {
@@ -49,261 +55,103 @@ export function orderEffortOptions(
     }));
 }
 
-type SpeckSite = {
-  left: string;
-  top: string;
-  size: number;
-  baseOpacity: number;
-  peakOpacity?: number;
-  echoOpacity?: number;
-  duration?: number;
-  delay?: number;
-  twinkle?: "echo" | "no-echo";
-  drift?: 1 | 2;
-  driftDuration?: number;
-  glow?: boolean;
-};
+const THUMB = 27;
+const INSET = THUMB / 2;
+const position = (frac: number) =>
+  `calc(${INSET}px + ${frac} * (100% - ${THUMB}px))`;
+const clamp = (value: number) => Math.min(1, Math.max(0, value));
 
-// Deterministic 34-site particle layout:
-// 8 in first third, 11 in middle third, 15 in final third — density and
-// brightness both lean right, and the field reaches within ~2% of the ends.
-// 20 × 1px, 10 × 1.5px, 4 × 2px.
-// 21 steady sites (opacity 0.16 → 0.34), 13 twinkling (peak 0.42 → 0.8, echo 45%).
-// 4 small particles drift alternating over 4300, 5100, 5900, 6700ms.
-const FULL_SPECKS: SpeckSite[] = [
-  // First third (8 sites)
-  { left: "2.5%", top: "58%", size: 1, baseOpacity: 0.16 },
-  { left: "5%", top: "30%", size: 1, baseOpacity: 0.16 },
-  { left: "7%", top: "35%", size: 1, baseOpacity: 0.17 },
-  {
-    left: "14%",
-    top: "68%",
-    size: 1,
-    baseOpacity: 0.18,
-    peakOpacity: 0.47,
-    echoOpacity: 0.21,
-    twinkle: "echo",
-    duration: 2710,
-    delay: -950,
-  },
-  {
-    left: "19%",
-    top: "28%",
-    size: 1.5,
-    baseOpacity: 0.19,
-    drift: 1,
-    driftDuration: 4300,
-  },
-  { left: "23%", top: "72%", size: 1, baseOpacity: 0.2 },
-  {
-    left: "29%",
-    top: "42%",
-    size: 1,
-    baseOpacity: 0.21,
-    peakOpacity: 0.52,
-    echoOpacity: 0.23,
-    twinkle: "no-echo",
-    duration: 3670,
-    delay: -1420,
-  },
-
-  // Middle third (11 sites)
-  { left: "34%", top: "58%", size: 1, baseOpacity: 0.22 },
-  { left: "37%", top: "24%", size: 1.5, baseOpacity: 0.23 },
-  {
-    left: "41%",
-    top: "76%",
-    size: 1,
-    baseOpacity: 0.23,
-    peakOpacity: 0.57,
-    echoOpacity: 0.26,
-    twinkle: "echo",
-    duration: 2300,
-    delay: -820,
-  },
-  {
-    left: "45%",
-    top: "38%",
-    size: 1,
-    baseOpacity: 0.24,
-    drift: 2,
-    driftDuration: 5100,
-  },
-  { left: "48%", top: "65%", size: 1.5, baseOpacity: 0.25 },
-  {
-    left: "53%",
-    top: "26%",
-    size: 1,
-    baseOpacity: 0.26,
-    peakOpacity: 0.61,
-    echoOpacity: 0.27,
-    twinkle: "no-echo",
-    duration: 4190,
-    delay: -1980,
-  },
-  { left: "57%", top: "78%", size: 1.5, baseOpacity: 0.26 },
-  {
-    left: "61%",
-    top: "34%",
-    size: 1,
-    baseOpacity: 0.27,
-    peakOpacity: 0.64,
-    echoOpacity: 0.29,
-    twinkle: "echo",
-    duration: 3130,
-    delay: -1120,
-  },
-  { left: "64%", top: "62%", size: 1, baseOpacity: 0.28 },
-  { left: "66%", top: "50%", size: 1, baseOpacity: 0.28 },
-
-  // Final third (15 sites)
-  {
-    left: "69%",
-    top: "22%",
-    size: 1.5,
-    baseOpacity: 0.28,
-    drift: 1,
-    driftDuration: 5900,
-  },
-  {
-    left: "71%",
-    top: "74%",
-    size: 1,
-    baseOpacity: 0.29,
-    peakOpacity: 0.68,
-    echoOpacity: 0.31,
-    twinkle: "no-echo",
-    duration: 2710,
-    delay: -1640,
-  },
-  { left: "74%", top: "44%", size: 2, baseOpacity: 0.29, glow: true },
-  { left: "77%", top: "26%", size: 1, baseOpacity: 0.3 },
-  {
-    left: "79%",
-    top: "78%",
-    size: 1,
-    baseOpacity: 0.3,
-    peakOpacity: 0.7,
-    echoOpacity: 0.32,
-    twinkle: "no-echo",
-    duration: 2710,
-    delay: -2050,
-  },
-  {
-    left: "80%",
-    top: "68%",
-    size: 1.5,
-    baseOpacity: 0.3,
-    peakOpacity: 0.71,
-    echoOpacity: 0.32,
-    twinkle: "echo",
-    duration: 3670,
-    delay: -890,
-  },
-  {
-    left: "82%",
-    top: "32%",
-    size: 1,
-    baseOpacity: 0.31,
-    drift: 2,
-    driftDuration: 6700,
-  },
-  {
-    left: "85%",
-    top: "76%",
-    size: 2,
-    baseOpacity: 0.31,
-    peakOpacity: 0.73,
-    echoOpacity: 0.33,
-    twinkle: "no-echo",
-    duration: 2300,
-    delay: -1350,
-    glow: true,
-  },
-  { left: "87%", top: "24%", size: 1, baseOpacity: 0.32 },
-  { left: "89%", top: "56%", size: 1.5, baseOpacity: 0.32 },
-  {
-    left: "91%",
-    top: "36%",
-    size: 1,
-    baseOpacity: 0.32,
-    peakOpacity: 0.75,
-    echoOpacity: 0.34,
-    twinkle: "echo",
-    duration: 4190,
-    delay: -2410,
-  },
-  { left: "93%", top: "72%", size: 2, baseOpacity: 0.33, glow: true },
-  {
-    left: "94%",
-    top: "28%",
-    size: 1.5,
-    baseOpacity: 0.33,
-    peakOpacity: 0.76,
-    echoOpacity: 0.34,
-    twinkle: "no-echo",
-    duration: 3130,
-    delay: -1790,
-  },
-  { left: "95%", top: "52%", size: 1, baseOpacity: 0.33 },
-  {
-    left: "96.5%",
-    top: "40%",
-    size: 1,
-    baseOpacity: 0.34,
-    peakOpacity: 0.8,
-    echoOpacity: 0.36,
-    twinkle: "echo",
-    duration: 2300,
-    delay: -610,
-  },
-  { left: "98%", top: "64%", size: 1, baseOpacity: 0.34 },
-];
-
-function renderSpeck(site: SpeckSite, key: number, isHighlight = false) {
-  const outerStyle: CSSProperties = {
-    left: site.left,
-    top: site.top,
-    width: `${site.size}px`,
-    height: `${site.size}px`,
-    ...(site.driftDuration
-      ? ({ "--drift-duration": `${site.driftDuration}ms` } as CSSProperties)
-      : {}),
-  };
-
-  if (isHighlight) {
-    return (
-      <i
-        key={key}
-        className="effort-speck"
-        data-drift={site.drift}
-        style={outerStyle}
-      >
-        <i className="effort-speck-inner" />
-      </i>
-    );
+// Invert the x coordinate of cubic-bezier(.22, .75, .18, 1).
+function settleEase(progress: number) {
+  const bezier = (t: number, a: number, b: number) =>
+    3 * (1 - t) ** 2 * t * a + 3 * (1 - t) * t * t * b + t ** 3;
+  let low = 0;
+  let high = 1;
+  for (let i = 0; i < 16; i++) {
+    const mid = (low + high) / 2;
+    if (bezier(mid, 0.22, 0.18) < progress) low = mid;
+    else high = mid;
   }
+  return bezier((low + high) / 2, 0.75, 1);
+}
 
-  const innerStyle = {
-    "--speck-base": site.baseOpacity,
-    ...(site.peakOpacity != null ? { "--speck-peak": site.peakOpacity } : {}),
-    ...(site.echoOpacity != null ? { "--speck-echo": site.echoOpacity } : {}),
-    ...(site.duration != null
-      ? { "--speck-duration": `${site.duration}ms` }
-      : {}),
-    ...(site.delay != null ? { "--speck-delay": `${site.delay}ms` } : {}),
-  } as CSSProperties;
+// Ten irregular sites per third; spacing is at least 4% in the 2D field.
+// Twenty 1px, eight 1.5px, two 2px. Larger particles stay dimmer.
+const FULL_SPECKS = [
+  [2, 57],
+  [5, 26],
+  [9, 73],
+  [14, 41],
+  [17, 64],
+  [21, 23],
+  [24, 49],
+  [27, 79],
+  [30, 34],
+  [32, 61],
+  [35, 21],
+  [38, 68],
+  [42, 43],
+  [45, 77],
+  [48, 29],
+  [51, 56],
+  [55, 22],
+  [58, 71],
+  [61, 38],
+  [65, 59],
+  [68, 79],
+  [71, 31],
+  [74, 54],
+  [78, 23],
+  [81, 67],
+  [84, 42],
+  [88, 76],
+  [91, 27],
+  [95, 53],
+  [98, 72],
+].map(([left, top], index) => {
+  const size =
+    index === 9 || index === 24
+      ? 2
+      : [1, 5, 11, 14, 18, 21, 26, 28].includes(index)
+        ? 1.5
+        : 1;
+  const base =
+    size === 2 ? 0.22 : size === 1.5 ? 0.27 : 0.32 + (index % 5) * 0.02;
+  const duration = (
+    { 3: 6400, 12: 7300, 20: 8100, 27: 9200 } as Record<number, number>
+  )[index];
+  return { left, top, size, base, duration };
+});
 
+function renderSpeck(
+  site: (typeof FULL_SPECKS)[number],
+  key: number,
+  isHighlight = false,
+) {
   return (
     <i
       key={key}
       className="effort-speck"
-      data-glow={site.glow ? "" : undefined}
-      data-twinkle={site.twinkle}
-      data-drift={site.drift}
-      style={outerStyle}
+      data-glow={site.size === 2 ? "" : undefined}
+      data-twinkle={!isHighlight && site.duration ? "" : undefined}
+      style={{
+        left: `${site.left}%`,
+        top: `${site.top}%`,
+        width: `${site.size}px`,
+        height: `${site.size}px`,
+      }}
     >
-      <i className="effort-speck-inner" style={innerStyle} />
+      <i
+        className="effort-speck-inner"
+        style={
+          {
+            "--speck-base": site.base,
+            "--speck-peak": site.base + 0.06,
+            "--speck-duration": `${site.duration}ms`,
+            "--speck-delay": `${-key * 317}ms`,
+          } as CSSProperties
+        }
+      />
     </i>
   );
 }
@@ -375,15 +223,13 @@ export function EffortMeterSpark({
         className="effort-rail"
         style={
           {
-            "--effort-frac": `calc(12px + ${frac} * (100% - 24px))`,
+            "--effort-frac": position(frac),
+            "--effort-thumb": `${THUMB}px`,
             "--effort-t": frac,
           } as CSSProperties
         }
       >
-        <div
-          className="effort-rail-fill"
-          style={{ width: "var(--effort-frac)" }}
-        >
+        <div className="effort-rail-fill">
           <div
             className="effort-top-tint"
             data-top-tier={topTier ? "" : undefined}
@@ -395,17 +241,19 @@ export function EffortMeterSpark({
         <div className="effort-specks-highlight" aria-hidden="true">
           {FULL_SPECKS.map((site, i) => renderSpeck(site, i, true))}
         </div>
-        {tiers.map((tier, index) => (
-          <i
-            key={tier.value}
-            className="effort-rail-tick"
-            data-passed={index < selectedIndex ? "" : undefined}
-            data-auto={tier.kind === "auto" ? "" : undefined}
-            style={{
-              left: `calc(12px + ${n > 1 ? index / (n - 1) : 0.5} * (100% - 24px))`,
-            }}
-          />
-        ))}
+        <div className="effort-ticks">
+          {tiers.map((tier, index) => (
+            <i
+              key={tier.value}
+              className="effort-rail-tick"
+              data-passed={n > 1 && index / (n - 1) < frac ? "" : undefined}
+              data-auto={tier.kind === "auto" ? "" : undefined}
+              style={{
+                left: position(n > 1 ? index / (n - 1) : 0),
+              }}
+            />
+          ))}
+        </div>
         <div className="effort-thumb">
           <div className="effort-thumb-inner" />
         </div>
@@ -436,17 +284,75 @@ export function EffortMeter({
 }) {
   const sliderRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
-  const [dragFrac, setDragFrac] = useState<number | null>(null);
+  const pointerId = useRef<number | null>(null);
+  const grabOffset = useRef(0);
+  const pointerX = useRef(0);
+  const frame = useRef<number | null>(null);
+  const velocity = useRef(0);
+  const lastSample = useRef({ x: 0, time: 0 });
   const [isPressed, setIsPressed] = useState(false);
 
   const selectedIndex = Math.max(
     0,
     tiers.findIndex((tier) => tier.value === value),
   );
+  const committedFrac =
+    tiers.length > 1 ? selectedIndex / (tiers.length - 1) : 0;
+  const [renderedFrac, setRenderedFrac] = useState(committedFrac);
+  const rendered = useRef(committedFrac);
+  const settleTarget = useRef<number | null>(null);
+  const [motion, setMotion] = useState({
+    light: 0,
+    sx: 1,
+    sy: 1,
+    origin: "50%",
+  });
+  const [settleMs, setSettleMs] = useState(140);
+  const paint = (frac: number) => {
+    rendered.current = frac;
+    setRenderedFrac(frac);
+  };
+  const stopFrame = () => {
+    if (frame.current != null) cancelAnimationFrame(frame.current);
+    frame.current = null;
+  };
+  const railRect = () =>
+    sliderRef.current?.querySelector(".effort-rail")?.getBoundingClientRect();
+  const settle = (target: number, duration: number) => {
+    stopFrame();
+    settleTarget.current = target;
+    const from = rendered.current;
+    const distance =
+      Math.abs(target - from) * Math.max(0, (railRect()?.width ?? 0) - THUMB);
+    const reduced = window.matchMedia?.(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    const ms = distance < 0.5 || reduced ? 0 : duration;
+    setSettleMs(ms);
+    if (!ms) {
+      paint(target);
+      return;
+    }
+    const start = performance.now();
+    const tick = (now: number) => {
+      const t = clamp((now - start) / ms);
+      paint(t === 1 ? target : from + (target - from) * settleEase(t));
+      frame.current = t < 1 ? requestAnimationFrame(tick) : null;
+    };
+    frame.current = requestAnimationFrame(tick);
+  };
+  useLayoutEffect(() => {
+    if (!dragging.current && settleTarget.current !== committedFrac) {
+      settle(committedFrac, 140);
+    }
+    // Only committed changes initiate keyboard/reset settling.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [committedFrac]);
+  useEffect(() => () => stopFrame(), []);
 
-  const nearestDragIndex =
-    dragFrac != null ? Math.round(dragFrac * (tiers.length - 1)) : null;
-  const shownIndex = nearestDragIndex ?? selectedIndex;
+  const shownIndex = isPressed
+    ? Math.round(renderedFrac * Math.max(0, tiers.length - 1))
+    : selectedIndex;
   const shownTier = tiers[shownIndex];
   const isDefault = value === defaultValue;
   const defaultLabel =
@@ -457,14 +363,49 @@ export function EffortMeter({
   }, []);
 
   const fracAt = (clientX: number) => {
-    const el = sliderRef.current;
-    if (!el) return 0;
-    const rail = el.querySelector<HTMLElement>(".effort-rail") ?? el;
-    const rect = rail.getBoundingClientRect();
-    const travel = rect.width - 24;
-    if (travel <= 0) return 0;
-    const x = clientX - rect.left;
-    return Math.min(1, Math.max(0, (x - 12) / travel));
+    const rect = railRect();
+    if (!rect || rect.width <= THUMB) return 0;
+    return clamp(
+      (clientX - grabOffset.current - rect.left - INSET) / (rect.width - THUMB),
+    );
+  };
+  const sampleDrag = (now: number) => {
+    const frac = fracAt(pointerX.current);
+    const x = pointerX.current;
+    const dt = Math.max(1, now - lastSample.current.time);
+    const instantaneous = (x - lastSample.current.x) / dt;
+    velocity.current +=
+      (instantaneous - velocity.current) * (1 - Math.exp(-dt / 45));
+    lastSample.current = { x, time: now };
+    const s = clamp(Math.abs(velocity.current) / 0.65);
+    setMotion({
+      light: 0.55 + 0.45 * s,
+      sx: 0.985 + 0.03 * s,
+      sy: 0.985 - 0.015 * s,
+      origin:
+        velocity.current > 0 ? "45%" : velocity.current < 0 ? "55%" : "50%",
+    });
+    paint(frac);
+    frame.current = requestAnimationFrame(sampleDrag);
+  };
+  const finishDrag = (cancel: boolean, clientX = pointerX.current) => {
+    if (!dragging.current) return;
+    const frac = fracAt(clientX);
+    const index = Math.round(frac * Math.max(0, tiers.length - 1));
+    const target = cancel
+      ? committedFrac
+      : tiers.length > 1
+        ? index / (tiers.length - 1)
+        : 0;
+    dragging.current = false;
+    pointerId.current = null;
+    setIsPressed(false);
+    setMotion({ light: 0, sx: 1, sy: 1, origin: "50%" });
+    const distance =
+      Math.abs(target - rendered.current) *
+      Math.max(0, (railRect()?.width ?? 0) - THUMB);
+    settle(target, Math.min(190, Math.max(110, 110 + 2 * distance)));
+    if (!cancel) commit(index);
   };
 
   const commit = (index: number) => {
@@ -491,7 +432,7 @@ export function EffortMeter({
   if (!shownTier) return null;
 
   return (
-    <div className="px-3.5 pt-3 pb-3">
+    <div className="px-4 pt-3 pb-3">
       <div className="flex h-6 items-center justify-between gap-2">
         <span className="min-w-0 truncate text-[13px] font-medium leading-[18px] text-content/92">
           {shownTier.label}
@@ -542,45 +483,70 @@ export function EffortMeter({
           commit(next);
         }}
         onPointerDown={(event) => {
+          if (dragging.current || event.button !== 0) return;
           event.preventDefault();
+          stopFrame();
+          settleTarget.current = null;
+          const rect = railRect();
+          const center =
+            (rect?.left ?? 0) +
+            INSET +
+            rendered.current * Math.max(0, (rect?.width ?? 0) - THUMB);
+          const offset = event.clientX - center;
+          const dy =
+            event.clientY - ((rect?.top ?? 0) + (rect?.height ?? 22) / 2);
+          grabOffset.current = Math.hypot(offset, dy) <= INSET ? offset : 0;
+          pointerX.current = event.clientX;
+          pointerId.current = event.pointerId;
           sliderRef.current?.setPointerCapture?.(event.pointerId);
           sliderRef.current?.focus();
           dragging.current = true;
+          velocity.current = 0;
+          lastSample.current = {
+            x: event.clientX,
+            time: performance.now(),
+          };
           setIsPressed(true);
-          setDragFrac(fracAt(event.clientX));
+          setMotion({ light: 0.55, sx: 0.985, sy: 0.985, origin: "50%" });
+          frame.current = requestAnimationFrame(sampleDrag);
         }}
         onPointerMove={(event) => {
-          if (dragging.current) {
-            setDragFrac(fracAt(event.clientX));
-          }
+          if (event.pointerId === pointerId.current)
+            pointerX.current = event.clientX;
         }}
         onPointerUp={(event) => {
-          if (!dragging.current) return;
-          dragging.current = false;
-          setIsPressed(false);
-          const frac = fracAt(event.clientX);
-          const nearestIndex = Math.round(frac * (tiers.length - 1));
-          setDragFrac(null);
-          commit(nearestIndex);
+          if (event.pointerId === pointerId.current)
+            finishDrag(false, event.clientX);
         }}
-        onPointerCancel={() => {
-          dragging.current = false;
-          setIsPressed(false);
-          setDragFrac(null);
+        onPointerCancel={(event) => {
+          if (event.pointerId === pointerId.current) finishDrag(true);
         }}
-        data-dragging={dragFrac != null ? "" : undefined}
+        onLostPointerCapture={(event) => {
+          if (event.pointerId === pointerId.current) finishDrag(true);
+        }}
+        data-dragging={isPressed ? "" : undefined}
+        data-sampled=""
         data-pressed={isPressed ? "" : undefined}
-        className="effort-slider relative mt-1.5 flex h-8 w-full items-center select-none"
-        style={{ touchAction: "none" }}
+        className="effort-slider relative mt-2 flex h-10 w-full items-center select-none"
+        style={
+          {
+            touchAction: "none",
+            "--effort-light": motion.light,
+            "--effort-sx": motion.sx,
+            "--effort-sy": motion.sy,
+            "--effort-origin": motion.origin,
+            "--effort-settle-ms": `${settleMs}ms`,
+          } as CSSProperties
+        }
       >
         <EffortMeterSpark
           tiers={tiers}
           selectedIndex={shownIndex}
           size="full"
-          dragFrac={dragFrac}
+          dragFrac={renderedFrac}
         />
       </div>
-      <div className="mt-0.5 flex items-center justify-between font-sans text-[10px] font-normal leading-[14px] text-content/48">
+      <div className="flex items-center justify-between font-sans text-[10px] font-normal leading-[14px] text-content/48">
         <span>{tiers[0]?.label}</span>
         <span>{tiers[tiers.length - 1]?.label}</span>
       </div>
