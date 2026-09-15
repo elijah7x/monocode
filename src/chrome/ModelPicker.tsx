@@ -884,7 +884,7 @@ export function EffortPicker({
         aria-haspopup="dialog"
         onMouseDown={(event) => event.preventDefault()}
         onClick={() => (open ? dismiss(true) : setOpen(true))}
-        className={`flex h-6.5 max-w-28 items-center gap-1 rounded-md px-1.5 ${
+        className={`flex h-6.5 max-w-36 items-center gap-1 rounded-md px-1.5 ${
           open
             ? "bg-content/10 text-content"
             : "bg-content/10 text-content hover:bg-content/15"
@@ -907,7 +907,7 @@ export function EffortPicker({
         <Popover
           anchor={button}
           side="top"
-          width={232}
+          width={248}
           onDismiss={(reason) => dismiss(reason === "escape")}
           role="dialog"
           aria-label="Effort"
