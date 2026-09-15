@@ -64,13 +64,16 @@ type SpeckSite = {
   glow?: boolean;
 };
 
-// Deterministic 26-site particle layout:
-// 5 in first third, 8 in middle third, 13 in final third.
-// 15 × 1px, 8 × 1.5px, 3 × 2px.
-// 16 steady sites (opacity 0.16 → 0.34), 10 twinkling (peak 0.42 → 0.78, echo 45%).
+// Deterministic 34-site particle layout:
+// 8 in first third, 11 in middle third, 15 in final third — density and
+// brightness both lean right, and the field reaches within ~2% of the ends.
+// 20 × 1px, 10 × 1.5px, 4 × 2px.
+// 21 steady sites (opacity 0.16 → 0.34), 13 twinkling (peak 0.42 → 0.8, echo 45%).
 // 4 small particles drift alternating over 4300, 5100, 5900, 6700ms.
 const FULL_SPECKS: SpeckSite[] = [
-  // First third (5 sites)
+  // First third (8 sites)
+  { left: "2.5%", top: "58%", size: 1, baseOpacity: 0.16 },
+  { left: "5%", top: "30%", size: 1, baseOpacity: 0.16 },
   { left: "7%", top: "35%", size: 1, baseOpacity: 0.17 },
   {
     left: "14%",
@@ -104,7 +107,8 @@ const FULL_SPECKS: SpeckSite[] = [
     delay: -1420,
   },
 
-  // Middle third (8 sites)
+  // Middle third (11 sites)
+  { left: "34%", top: "58%", size: 1, baseOpacity: 0.22 },
   { left: "37%", top: "24%", size: 1.5, baseOpacity: 0.23 },
   {
     left: "41%",
@@ -150,8 +154,9 @@ const FULL_SPECKS: SpeckSite[] = [
     delay: -1120,
   },
   { left: "64%", top: "62%", size: 1, baseOpacity: 0.28 },
+  { left: "66%", top: "50%", size: 1, baseOpacity: 0.28 },
 
-  // Final third (13 sites)
+  // Final third (15 sites)
   {
     left: "69%",
     top: "22%",
@@ -173,6 +178,17 @@ const FULL_SPECKS: SpeckSite[] = [
   },
   { left: "74%", top: "44%", size: 2, baseOpacity: 0.29, glow: true },
   { left: "77%", top: "26%", size: 1, baseOpacity: 0.3 },
+  {
+    left: "79%",
+    top: "78%",
+    size: 1,
+    baseOpacity: 0.3,
+    peakOpacity: 0.7,
+    echoOpacity: 0.32,
+    twinkle: "no-echo",
+    duration: 2710,
+    delay: -2050,
+  },
   {
     left: "80%",
     top: "68%",
@@ -230,6 +246,18 @@ const FULL_SPECKS: SpeckSite[] = [
     delay: -1790,
   },
   { left: "95%", top: "52%", size: 1, baseOpacity: 0.33 },
+  {
+    left: "96.5%",
+    top: "40%",
+    size: 1,
+    baseOpacity: 0.34,
+    peakOpacity: 0.8,
+    echoOpacity: 0.36,
+    twinkle: "echo",
+    duration: 2300,
+    delay: -610,
+  },
+  { left: "98%", top: "64%", size: 1, baseOpacity: 0.34 },
 ];
 
 function renderSpeck(site: SpeckSite, key: number, isHighlight = false) {
@@ -309,7 +337,12 @@ export function EffortMeterSpark({
         aria-hidden="true"
         data-effort-rail="mini"
         className={`effort-rail effort-rail-mini${className ? ` ${className}` : ""}`}
-        style={{ "--effort-frac": `${frac * 100}%` } as CSSProperties}
+        style={
+          {
+            "--effort-frac": `${frac * 100}%`,
+            "--effort-t": frac,
+          } as CSSProperties
+        }
       >
         <div
           className="effort-rail-fill"
@@ -343,12 +376,13 @@ export function EffortMeterSpark({
         style={
           {
             "--effort-frac": `calc(12px + ${frac} * (100% - 24px))`,
+            "--effort-t": frac,
           } as CSSProperties
         }
       >
         <div
           className="effort-rail-fill"
-          style={{ width: "calc(var(--effort-frac) - 1px)" }}
+          style={{ width: "var(--effort-frac)" }}
         >
           <div
             className="effort-top-tint"
