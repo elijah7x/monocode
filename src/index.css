@@ -1492,9 +1492,10 @@ html.theme-light .popover-backdrop {
   }
 }
 
-/* Effort meter: bars light up to the selected tier and the peak bar
-   breathes like the thinking line. The top tier takes the accent — the
-   default, or the user's when one is configured. */
+/* Effort meter: a continuous rail that brightens toward the selected tier.
+   Tick marks keep the discreteness visible and specks twinkle inside the
+   fill. The top tier takes the accent — the default, or the user's when one
+   is configured. */
 :root {
   --effort-accent: var(--color-accent);
 }
@@ -1503,8 +1504,99 @@ html.has-user-accent {
   --effort-accent: var(--user-accent-color);
 }
 
-.effort-meter-bar {
-  transition: opacity var(--motion-feedback-duration) var(--motion-ease-out);
+.effort-rail {
+  position: relative;
+  height: 20px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-content) 10%, transparent);
+  overflow: hidden;
+}
+
+.effort-rail-mini {
+  width: 34px;
+  height: 10px;
+}
+
+.effort-rail-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  overflow: hidden;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-content) 30%, transparent),
+    color-mix(in srgb, var(--color-content) 75%, transparent)
+  );
+  transition: width var(--motion-feedback-duration) var(--motion-ease-out);
+}
+
+[data-dragging] .effort-rail-fill {
+  transition: none;
+}
+
+/* The fill's right edge is the knob: a brighter cap that breathes. */
+.effort-rail-fill::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 3px;
+  background: color-mix(in srgb, var(--color-content) 85%, transparent);
+  animation: effort-meter-breathe 1.8s ease-in-out infinite;
+}
+
+.effort-rail-mini .effort-rail-fill::after {
+  animation: none;
+}
+
+/* The track clips this to a glow trapped inside the rail. */
+.effort-rail-fill[data-top-tier] {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-content) 30%, transparent),
+    color-mix(in srgb, var(--effort-accent) 85%, transparent)
+  );
+  box-shadow: 0 0 10px color-mix(in srgb, var(--effort-accent) 60%, transparent);
+}
+
+.effort-rail-mini .effort-rail-fill[data-top-tier] {
+  box-shadow: none;
+}
+
+.effort-rail-tick {
+  position: absolute;
+  top: 50%;
+  width: 1.5px;
+  height: 30%;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-content) 35%, transparent);
+}
+
+/* Auto sits at index 0; a hollow ring distinguishes it from a real level. */
+.effort-rail-tick[data-auto] {
+  width: 5px;
+  height: 5px;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--color-content) 40%, transparent);
+}
+
+.effort-specks {
+  position: absolute;
+  inset: 0;
+}
+
+.effort-speck {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+  background: var(--color-content);
+  opacity: 0;
+  animation: effort-speck 1.8s ease-in-out infinite;
 }
 
 @keyframes effort-meter-breathe {
@@ -1517,24 +1609,34 @@ html.has-user-accent {
   }
 }
 
-.effort-meter-peak {
-  animation: effort-meter-breathe 1.8s ease-in-out infinite;
+@keyframes effort-speck {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.8;
+  }
 }
 
-.effort-meter-bar[data-top-tier] {
-  fill: var(--effort-accent);
-  opacity: 1;
-  filter: drop-shadow(0 0 4px var(--effort-accent));
+/* The chip should not twinkle in the toolbar. */
+.effort-rail-mini .effort-speck {
+  animation: none;
+  opacity: 0.35;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .effort-meter-peak {
-    animation: none;
-    opacity: 1;
+  .effort-rail-fill {
+    transition: none;
   }
 
-  .effort-meter-bar {
-    transition: none;
+  .effort-rail-fill::after {
+    animation: none;
+  }
+
+  .effort-speck {
+    animation: none;
+    opacity: 0.35;
   }
 }
 
