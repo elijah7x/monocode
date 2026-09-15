@@ -232,7 +232,7 @@ const FULL_SPECKS: SpeckSite[] = [
   { left: "95%", top: "52%", size: 1, baseOpacity: 0.33 },
 ];
 
-function renderSpeck(site: SpeckSite, key: number) {
+function renderSpeck(site: SpeckSite, key: number, isHighlight = false) {
   const outerStyle: CSSProperties = {
     left: site.left,
     top: site.top,
@@ -242,6 +242,19 @@ function renderSpeck(site: SpeckSite, key: number) {
       ? ({ "--drift-duration": `${site.driftDuration}ms` } as CSSProperties)
       : {}),
   };
+
+  if (isHighlight) {
+    return (
+      <i
+        key={key}
+        className="effort-speck"
+        data-drift={site.drift}
+        style={outerStyle}
+      >
+        <i className="effort-speck-inner" />
+      </i>
+    );
+  }
 
   const innerStyle = {
     "--speck-base": site.baseOpacity,
@@ -269,7 +282,7 @@ function renderSpeck(site: SpeckSite, key: number) {
 
 /**
  * The rail only: a continuous track that fills to the selected tier, with a
- * tick mark per tier, stationary speck field, separate thumb, and top-tier accent halo.
+ * tick mark per tier, stationary speck field, separate thumb, and top-tier accent aura.
  */
 export function EffortMeterSpark({
   tiers,
@@ -324,11 +337,6 @@ export function EffortMeterSpark({
   return (
     <div className={`relative w-full${className ? ` ${className}` : ""}`}>
       <div
-        className="effort-top-halo"
-        data-active={topTier ? "" : undefined}
-        aria-hidden="true"
-      />
-      <div
         aria-hidden="true"
         data-effort-rail="full"
         className="effort-rail"
@@ -349,6 +357,9 @@ export function EffortMeterSpark({
         </div>
         <div className="effort-specks">
           {FULL_SPECKS.map((site, i) => renderSpeck(site, i))}
+        </div>
+        <div className="effort-specks-highlight" aria-hidden="true">
+          {FULL_SPECKS.map((site, i) => renderSpeck(site, i, true))}
         </div>
         {tiers.map((tier, index) => (
           <i
@@ -393,8 +404,6 @@ export function EffortMeter({
   const dragging = useRef(false);
   const [dragFrac, setDragFrac] = useState<number | null>(null);
   const [isPressed, setIsPressed] = useState(false);
-  const [isReleasing, setIsReleasing] = useState(false);
-  const releaseTimer = useRef<number | null>(null);
 
   const selectedIndex = Math.max(
     0,
@@ -411,9 +420,6 @@ export function EffortMeter({
 
   useEffect(() => {
     sliderRef.current?.focus();
-    return () => {
-      if (releaseTimer.current) window.clearTimeout(releaseTimer.current);
-    };
   }, []);
 
   const fracAt = (clientX: number) => {
@@ -503,12 +509,10 @@ export function EffortMeter({
         }}
         onPointerDown={(event) => {
           event.preventDefault();
-          sliderRef.current?.setPointerCapture(event.pointerId);
+          sliderRef.current?.setPointerCapture?.(event.pointerId);
           sliderRef.current?.focus();
           dragging.current = true;
           setIsPressed(true);
-          setIsReleasing(false);
-          if (releaseTimer.current) window.clearTimeout(releaseTimer.current);
           setDragFrac(fracAt(event.clientX));
         }}
         onPointerMove={(event) => {
@@ -520,26 +524,19 @@ export function EffortMeter({
           if (!dragging.current) return;
           dragging.current = false;
           setIsPressed(false);
-          setIsReleasing(true);
           const frac = fracAt(event.clientX);
           const nearestIndex = Math.round(frac * (tiers.length - 1));
           setDragFrac(null);
           commit(nearestIndex);
-          if (releaseTimer.current) window.clearTimeout(releaseTimer.current);
-          releaseTimer.current = window.setTimeout(() => {
-            setIsReleasing(false);
-          }, 220);
         }}
         onPointerCancel={() => {
           dragging.current = false;
           setIsPressed(false);
-          setIsReleasing(false);
           setDragFrac(null);
         }}
         data-dragging={dragFrac != null ? "" : undefined}
         data-pressed={isPressed ? "" : undefined}
-        data-releasing={isReleasing ? "" : undefined}
-        className="effort-slider relative mt-px flex h-10 w-full cursor-ew-resize items-center outline-none select-none"
+        className="effort-slider relative mt-1.5 flex h-8 w-full items-center select-none"
         style={{ touchAction: "none" }}
       >
         <EffortMeterSpark
@@ -549,7 +546,7 @@ export function EffortMeter({
           dragFrac={dragFrac}
         />
       </div>
-      <div className="-mt-px flex items-center justify-between font-sans text-[10px] font-normal leading-[14px] text-content/48">
+      <div className="mt-0.5 flex items-center justify-between font-sans text-[10px] font-normal leading-[14px] text-content/48">
         <span>{tiers[0]?.label}</span>
         <span>{tiers[tiers.length - 1]?.label}</span>
       </div>
