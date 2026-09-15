@@ -244,7 +244,9 @@ describe("model picker", () => {
       'button[aria-label="Effort: High"]',
     )!;
     expect(effortTrigger.textContent).toBe("High");
-    expect(effortTrigger.querySelector("svg")).not.toBeNull();
+    expect(
+      effortTrigger.querySelector('[data-effort-rail="mini"]'),
+    ).not.toBeNull();
     act(() => effortTrigger.click());
     const effortSlider = container.querySelector<HTMLElement>(
       '[role="slider"][aria-label="Effort"]',

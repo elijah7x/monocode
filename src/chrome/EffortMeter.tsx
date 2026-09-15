@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { RotateCcw } from "./icons";
 
 export type EffortTier = {
@@ -50,13 +50,24 @@ export function orderEffortOptions(
     }));
 }
 
-const MINI = { barWidth: 2, gap: 1.5, height: 10, radius: 0.5 };
-// preserveAspectRatio="none" stretches the full meter, so rx is mini-only —
-// a corner radius there would distort with the non-uniform scale.
-const FULL = { barWidth: 24, gap: 8, height: 22, radius: 1 };
+const SPECK_COUNT: Record<"mini" | "full", number> = { mini: 6, full: 18 };
 
-/** The bars only: an SVG sparkline of effort tiers, bottom-aligned. */
-export function EffortMeterBars({
+// Deterministic speck layout — stable across renders so the twinkle field
+// does not jump when the selection moves.
+function speckStyle(index: number): CSSProperties {
+  return {
+    left: `${(index * 37 + 11) % 90}%`,
+    top: `${((index * 53 + 7) % 60) + 20}%`,
+    animationDuration: `${1.2 + (index % 5) * 0.3}s`,
+    animationDelay: `${-index * 0.17}s`,
+  };
+}
+
+/**
+ * The rail only: a continuous track that fills to the selected tier, with a
+ * tick mark per tier and twinkling specks inside the fill.
+ */
+export function EffortMeterSpark({
   tiers,
   selectedIndex,
   size,
@@ -67,61 +78,55 @@ export function EffortMeterBars({
   size: "mini" | "full";
   className?: string;
 }) {
-  const { barWidth, gap, height, radius } = size === "mini" ? MINI : FULL;
   const n = tiers.length;
   if (n === 0) return null;
-  const width = n * barWidth + (n - 1) * gap;
+  const frac = n > 1 ? selectedIndex / (n - 1) : 1;
+  // A floor keeps a sliver visible at the lowest tier.
+  const widthPct = Math.max(frac * 100, 10);
+  const topTier =
+    selectedIndex === n - 1 ||
+    TOP_TIER_VALUES.has(tiers[selectedIndex]?.value ?? "");
   return (
-    <svg
-      viewBox={`0 0 ${width} ${height}`}
-      height={height}
-      preserveAspectRatio={size === "full" ? "none" : undefined}
+    <div
       aria-hidden="true"
-      className={
-        size === "full" ? `block w-full ${className ?? ""}` : className
-      }
+      data-effort-rail={size}
+      className={`effort-rail${size === "mini" ? " effort-rail-mini" : ""}${className ? ` ${className}` : ""}`}
     >
-      {tiers.map((tier, index) => {
-        const lit = index <= selectedIndex;
-        const peak = index === selectedIndex;
-        const topTier =
-          peak && (index === n - 1 || TOP_TIER_VALUES.has(tier.value));
-        const barHeight =
-          tier.kind === "auto"
-            ? height * 0.3
-            : n > 1
-              ? height * (0.35 + (0.65 * index) / (n - 1))
-              : height;
-        const hollow = tier.kind === "auto" || (tier.kind === "beyond" && !lit);
-        return (
-          <rect
-            key={tier.value}
-            className={`effort-meter-bar${peak && size === "full" ? " effort-meter-peak" : ""}`}
-            x={index * (barWidth + gap)}
-            y={height - barHeight}
-            width={barWidth}
-            height={barHeight}
-            rx={size === "mini" ? radius : 0}
-            fill={hollow ? "none" : "currentColor"}
-            stroke={hollow ? "currentColor" : undefined}
-            strokeWidth={hollow ? 1 : undefined}
-            strokeDasharray={
-              tier.kind === "beyond" && !lit ? "2 1.5" : undefined
-            }
-            vectorEffect="non-scaling-stroke"
-            opacity={lit ? 0.85 : 0.18}
-            data-top-tier={topTier ? "" : undefined}
-          />
-        );
-      })}
-    </svg>
+      <div
+        className="effort-rail-fill"
+        data-top-tier={topTier ? "" : undefined}
+        style={{ width: `${widthPct}%`, opacity: 0.6 + 0.4 * frac }}
+      >
+        {/* Specks sit on a layer stretched to track width inside the clipped
+            fill, so the fill edge reveals more of them as it moves right. */}
+        <div
+          className="effort-specks"
+          style={{
+            width: `${10000 / widthPct}%`,
+            opacity: 0.45 + 0.55 * frac,
+          }}
+        >
+          {Array.from({ length: SPECK_COUNT[size] }, (_, index) => (
+            <i key={index} className="effort-speck" style={speckStyle(index)} />
+          ))}
+        </div>
+      </div>
+      {tiers.map((tier, index) => (
+        <i
+          key={tier.value}
+          className="effort-rail-tick"
+          data-auto={tier.kind === "auto" ? "" : undefined}
+          style={{ left: `${n > 1 ? (index / (n - 1)) * 100 : 50}%` }}
+        />
+      ))}
+    </div>
   );
 }
 
 /**
- * Discrete effort control: a segmented meter that acts as a slider. Bars
- * fill up to the selected tier, the peak bar breathes, and the top tier
- * takes the accent color.
+ * Discrete effort control: a glowing rail that acts as a slider. The fill
+ * edge snaps between tier ticks, specks twinkle harder toward the top, and
+ * the top tier takes the accent color.
  */
 export function EffortMeter({
   tiers,
@@ -260,9 +265,10 @@ export function EffortMeter({
           dragging.current = false;
           setDragIndex(null);
         }}
+        data-dragging={dragIndex != null ? "" : undefined}
         className="mt-2 cursor-ew-resize rounded-sm outline-none focus-visible:ring-1 focus-visible:ring-accent"
       >
-        <EffortMeterBars
+        <EffortMeterSpark
           tiers={tiers}
           selectedIndex={shownIndex}
           size="full"
