@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Block } from "../lib/session";
+import { INTERRUPT_MESSAGE } from "../lib/inFlight";
 import {
   activityPhaseTitle,
   activityStillRunning,
@@ -840,7 +841,7 @@ describe("the settled work trail", () => {
     ]);
     const items = groupTurnItems(turn, { settled: true });
     expect(items).toHaveLength(1);
-    if (items[0]?.type !== "activity") return;
+    if (items[0]?.type !== "activity") throw new Error("expected activity");
     expect(items[0].blocks.map((block) => block.id)).toEqual([
       "a",
       "ag",
@@ -978,6 +979,64 @@ describe("the settled work trail", () => {
         status("st2", "Working on it"),
       ]),
     ).toBe(false);
+  });
+
+  it("keeps an error outside the trail after a completed call, live or settled", () => {
+    const turn: Block[] = [
+      { id: "u", role: "user", text: "go" },
+      shell("t1"),
+      {
+        id: "e1",
+        role: "system",
+        text: "Provider connection lost",
+        notice: "error",
+      },
+      { id: "done", role: "assistant", text: "It failed." },
+    ];
+    for (const options of [undefined, { settled: false }, { settled: true }]) {
+      const items = groupTurnItems(turn, options);
+      expect(items.map((item) => item.type)).toEqual([
+        "block",
+        "activity",
+        "block",
+        "block",
+      ]);
+      expect(items[2]).toMatchObject({ type: "block", block: { id: "e1" } });
+      // And on the bare sequence — user, done call, error — all the same.
+      expect(
+        groupTurnItems(turn.slice(0, 3), options).map((item) => item.type),
+      ).toEqual(["block", "activity", "block"]);
+    }
+    // And the fold the answer puts away stops short of the error's row.
+    const items = groupTurnItems(turn, { settled: true });
+    const fold = foldableWork(items)!;
+    expect(foldedBlocks(items, fold).map((block) => block.id)).toEqual(["t1"]);
+  });
+
+  it("keeps a persisted interrupt outside the trail even without the tag", () => {
+    const items = groupTurnItems(
+      [
+        shell("a"),
+        { id: "int", role: "system", text: INTERRUPT_MESSAGE },
+        shell("b"),
+      ],
+      { settled: true },
+    );
+    expect(items.map((item) => item.type)).toEqual([
+      "activity",
+      "block",
+      "activity",
+    ]);
+  });
+
+  it("labels a group that only reported status", () => {
+    const statuses = [status("s1"), status("s2", "Working on it")];
+    expect(workSummaryLine(statuses)).toBe("Status update");
+    const phases = buildActivityPhases(statuses);
+    expect(activityPhaseTitle(phases[0])).toBe("Status update");
+    expect(workKind(statuses)).toBe("note");
+    // A thought among the statuses still reads as thinking, not a status line.
+    expect(workSummaryLine([status("s1"), thought("r1")])).toBe("Thought");
   });
 });
 

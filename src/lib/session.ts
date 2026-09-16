@@ -14,7 +14,7 @@ import {
 } from "./models";
 
 export type HarnessId =
-  "claude" | "codex" | "cursor" | "grok" | "opencode" | "pi" | "omp" | "fx";
+  "claude" | "codex" | "cursor" | "grok" | "opencode" | "pi" | "omp" | "fx" | "kimi" | "antigravity";
 
 export const HARNESSES: HarnessId[] = [
   "claude",
@@ -25,6 +25,8 @@ export const HARNESSES: HarnessId[] = [
   "pi",
   "omp",
   "fx",
+  "kimi",
+  "antigravity",
 ];
 
 export type BlockRole =
@@ -72,10 +74,13 @@ export type PlanBlockMeta = {
   edited?: boolean;
 };
 
-export type PlanBuildTarget = {
+export type ModelTarget = {
   harness: HarnessId;
   model: string;
+  modelSettings: Record<string, string>;
 };
+
+export type PlanBuildTarget = ModelTarget;
 
 export type HandoffStatus = "preparing" | "ready";
 
@@ -249,6 +254,11 @@ export type Block = {
   noteCard?: NoteCardMeta;
   /** Mid-turn interjection chrome; system blocks only. Body lives in text. */
   interjection?: InterjectionMeta;
+  /**
+   * A system row the reader must not miss — an error or an interruption —
+   * rather than turn chrome like a status ping. Never folds into the trail.
+   */
+  notice?: "error" | "interrupt";
 };
 
 export type RuntimeMode =
@@ -358,6 +368,8 @@ export const HARNESS_LABEL: Record<HarnessId, string> = {
   pi: "pi",
   omp: "omp",
   fx: "fx",
+  kimi: "kimi",
+  antigravity: "antigravity",
 };
 
 export const HARNESS_TITLE: Record<HarnessId, string> = {
@@ -369,6 +381,8 @@ export const HARNESS_TITLE: Record<HarnessId, string> = {
   pi: "Pi",
   omp: "omp",
   fx: "fx",
+  kimi: "Kimi Code",
+  antigravity: "Antigravity",
 };
 
 /** fx ACP rejects attachment prompt blocks. */
