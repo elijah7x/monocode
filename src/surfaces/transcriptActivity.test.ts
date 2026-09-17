@@ -13,6 +13,7 @@ import {
   groupTurns,
   hasRunningSubagent,
   initialThinkingIndex,
+  isNarrationItem,
   isProseBlock,
   lastActivityIndex,
   nestedScrollAbsorbsWheel,
@@ -26,6 +27,7 @@ import {
   subagentModelName,
   workKind,
   workSummaryLine,
+  type TurnItem,
 } from "./transcriptActivity";
 
 function shell(
@@ -1222,6 +1224,119 @@ describe("foldableWork", () => {
         .map((item) => (item as { block: Block }).block.id);
       expect(visibleIds).toEqual(["report", "verify"]);
     }
+  });
+});
+
+describe("isNarrationItem", () => {
+  const advisor = (id: string): Block => ({
+    id,
+    role: "system",
+    text: `advisor note ${id}`,
+    interjection: { customType: "advisor", severity: "concern" },
+  });
+  const narrationIds = (turnItems: TurnItem[]) =>
+    turnItems.flatMap((item, index) =>
+      item.type === "block" && isNarrationItem(turnItems, index)
+        ? [item.block.id]
+        : [],
+    );
+
+  it("demotes prose sandwiched by two completed work groups", () => {
+    const turn = groupTurnItems([
+      { id: "u", role: "user", text: "go" },
+      shell("a"),
+      note("n1", "Step two: patching the resolver."),
+      shell("b"),
+      note("n2", "Done."),
+    ]);
+    expect(narrationIds(turn)).toEqual(["n1"]);
+  });
+
+  it("demotes a multi-paragraph narration run as a unit", () => {
+    const turn = groupTurnItems([
+      { id: "u", role: "user", text: "go" },
+      shell("a"),
+      note("n1", "Reading the config."),
+      note("n2", "It points at the old resolver."),
+      shell("b"),
+      note("n3", "Done."),
+    ]);
+    expect(narrationIds(turn)).toEqual(["n1", "n2"]);
+  });
+
+  it("keeps the answer beside an exchange at full strength", () => {
+    // The incident shape: a delivered answer, then a note, then more work.
+    // The answer's successor is the exchange, not work, so it never demotes.
+    const turn = groupTurnItems([
+      { id: "u", role: "user", text: "go" },
+      shell("a"),
+      note("answer", "Here is the whole answer."),
+      advisor("ad1"),
+      shell("b"),
+      note("tail", "Adjusted."),
+    ]);
+    expect(narrationIds(turn)).toEqual([]);
+  });
+
+  it("keeps prose beside running or approval-pending work at full strength", () => {
+    const running = groupTurnItems([
+      { id: "u", role: "user", text: "go" },
+      shell("a"),
+      note("n1", "Working on it."),
+      shell("b", "running"),
+      note("n2", "Done."),
+    ]);
+    expect(narrationIds(running)).toEqual([]);
+
+    const pending = groupTurnItems([
+      { id: "u", role: "user", text: "go" },
+      shell("a"),
+      note("n1", "Shall I proceed?"),
+      shell("b", "pending", { requestId: 1 }),
+      note("n2", "Done."),
+    ]);
+    expect(narrationIds(pending)).toEqual([]);
+  });
+
+  it("keeps prose beside failed or status-only groups at full strength", () => {
+    const failed = groupTurnItems([
+      { id: "u", role: "user", text: "go" },
+      shell("a"),
+      note("n1", "The patch failed."),
+      shell("b", "failed"),
+      note("n2", "Done."),
+    ]);
+    expect(narrationIds(failed)).toEqual([]);
+
+    const statusOnly = groupTurnItems([
+      { id: "u", role: "user", text: "go" },
+      status("s1", "Preparing"),
+      note("n1", "Narration?"),
+      shell("b"),
+      note("n2", "Done."),
+    ]);
+    expect(narrationIds(statusOnly)).toEqual([]);
+  });
+
+  it("keeps terminal prose at full strength and never demotes across a notice", () => {
+    const terminal = groupTurnItems([
+      { id: "u", role: "user", text: "go" },
+      shell("a"),
+      note("n1", "Narration."),
+      shell("b"),
+      note("n2", "The final answer."),
+    ]);
+    expect(narrationIds(terminal)).toEqual(["n1"]);
+
+    const bounded = groupTurnItems([
+      { id: "u", role: "user", text: "go" },
+      shell("a"),
+      note("n1", "Notice-adjacent prose."),
+      { id: "err", role: "system", text: "Interrupted", notice: "error" },
+      shell("b"),
+      note("n2", "Done."),
+    ]);
+    expect(narrationIds(bounded)).toEqual([]);
   });
 });
 

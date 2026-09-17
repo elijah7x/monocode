@@ -356,6 +356,37 @@ function isExchangeContinuation(notes: Block[], block: Block): boolean {
 }
 
 /**
+ * Prose talking to itself between two finished work groups is step
+ * narration — demote it, never hide it. A maximal prose run demotes as a
+ * unit when work flanks both ends. Both flanks must be collapsible groups
+ * with real calls inside: a group that is still running, awaiting approval,
+ * failed, or holds only status rows is live context or a decision point,
+ * and the prose beside it keeps full strength. Content boundaries —
+ * exchanges, subagent rows, notices — never demote what they touch; the
+ * incident answer's successor is an exchange, which is exactly what keeps
+ * delivered answers out of this rule.
+ */
+export function isNarrationItem(items: TurnItem[], index: number): boolean {
+  const isProse = (item: TurnItem | undefined) =>
+    item?.type === "block" && isProseBlock(item.block);
+  if (!isProse(items[index])) return false;
+  let start = index;
+  while (isProse(items[start - 1])) start -= 1;
+  let end = index;
+  while (isProse(items[end + 1])) end += 1;
+  return isWorkFlank(items[start - 1]) && isWorkFlank(items[end + 1]);
+}
+
+/** A completed work group with real calls in it — scenery, not live context. */
+function isWorkFlank(item: TurnItem | undefined): boolean {
+  if (item?.type !== "activity" || !isCollapsibleWork(item)) return false;
+  return (
+    item.blocks.some((block) => block.role !== "system") &&
+    !item.blocks.some((block) => toolCallState(block) === "rejected")
+  );
+}
+
+/**
  * Some harnesses publish private reasoning before their first assistant text.
  * Keep it around only while that text has not arrived; if a tool starts first,
  * the reasoning belongs to that activity group and remains visible there.
