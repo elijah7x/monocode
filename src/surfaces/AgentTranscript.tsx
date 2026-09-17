@@ -84,6 +84,7 @@ import {
   editVerb,
   firstWorkIndex,
   foldableWork,
+  foldContentCounts,
   foldedBlocks,
   groupTurnItems,
   groupTurns,
@@ -91,12 +92,14 @@ import {
   isCollapsibleWork,
   isIncompleteTool,
   isNarrationItem,
+  isSettledFoldMember,
   isSubagentBlock,
   isThinkingBlock,
   lastActivityIndex,
   isProseBlock,
   needsApproval,
   nestedScrollAbsorbsWheel,
+  settledFold,
   proseSummary,
   subagentBrief,
   subagentModelName,
@@ -428,10 +431,15 @@ function AgentTranscriptComponent({
             ? (turnModel?.harness ?? harnessForTurn(blocks, turn, harness))
             : undefined;
           // Work the turn has already answered for folds away behind one line,
-          // leaving the prompt and the answer to it.
+          // leaving the prompt and the answer to it. Settled turns fold
+          // wider: the whole earlier conversation — work, narration, routine
+          // exchanges — under the "Worked for" line, with the terminal
+          // message and anything still needing eyes kept out.
           const turnId = turn[0].id;
-          const fold = foldableWork(items);
+          const fold = settled ? settledFold(items) : foldableWork(items);
           const folded = fold ? foldedBlocks(items, fold) : [];
+          const foldCounts =
+            fold && settled ? foldContentCounts(items, fold) : undefined;
           const workOpen = openWork[turnId] ?? false;
           // The fold line is the turn's status line from the first token to
           // the last: the mark, and the clock beside it. It never moves, so a
@@ -455,10 +463,27 @@ function AgentTranscriptComponent({
               }
               modelName={turnModelName}
             />
-          ) : durationMs != null ? (
-            formatWorkingDuration(durationMs, turnModelName, true)
           ) : (
-            workSummaryLine(folded)
+            <>
+              {durationMs != null
+                ? formatWorkingDuration(durationMs, turnModelName, true)
+                : workSummaryLine(folded)}
+              {foldCounts &&
+              (foldCounts.messages > 0 || foldCounts.inputs > 0) ? (
+                <span className="text-content/35">
+                  {[
+                    foldCounts.messages > 0
+                      ? `${foldCounts.messages} earlier message${foldCounts.messages > 1 ? "s" : ""}`
+                      : "",
+                    foldCounts.inputs > 0
+                      ? `${foldCounts.inputs} advisor input${foldCounts.inputs > 1 ? "s" : ""}`
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .map((part) => ` · ${part}`)}
+                </span>
+              ) : null}
+            </>
           );
           const showFoldLine = live || durationMs != null || !!fold;
           // The line sits at the first work group, from before there is any:
@@ -585,34 +610,30 @@ function AgentTranscriptComponent({
               {items.flatMap((item, itemIndex) => {
                 const inSpan =
                   !!fold && itemIndex >= fold.start && itemIndex <= fold.end;
-                // Work collapses, and narration — prose the agent addressed
-                // to itself between two completed work groups — collapses
-                // with it. Delivered prose, interjections, and pinned runs
-                // keep their rows whether the work is open or shut, so a
-                // settled transcript reads like the live one did.
-                const foldMember =
-                  isCollapsibleWork(item) ||
-                  isNarrationItem(items, itemIndex);
-                if (inSpan && foldMember) {
+                // Settled folds hide earlier prose and routine exchanges
+                // alongside finished work; live folds hide only finished
+                // work and the narration it sandwiches. What keeps its row —
+                // the terminal message, notices, open approvals, delegated
+                // runs, exceptional exchanges — splits the fold into runs
+                // under the one control.
+                const memberAt = (index: number) => {
+                  const entry = items[index];
+                  if (!entry) return false;
+                  if (settled) return isSettledFoldMember(entry);
+                  return (
+                    isCollapsibleWork(entry) ||
+                    isNarrationItem(items, index)
+                  );
+                };
+                if (inSpan && memberAt(itemIndex)) {
                   // Contiguous members share one folded wrapper; visible
                   // content between runs closes it and the next run opens a
                   // new one, all under the same control.
-                  if (itemIndex > fold.start) {
-                    const prev = items[itemIndex - 1];
-                    const prevMember =
-                      isCollapsibleWork(prev) ||
-                      isNarrationItem(items, itemIndex - 1);
-                    if (prevMember) return [];
+                  if (itemIndex > fold.start && memberAt(itemIndex - 1)) {
+                    return [];
                   }
                   let runEnd = itemIndex;
-                  while (runEnd + 1 <= fold.end) {
-                    const next = items[runEnd + 1];
-                    if (
-                      !isCollapsibleWork(next) &&
-                      !isNarrationItem(items, runEnd + 1)
-                    ) {
-                      break;
-                    }
+                  while (runEnd + 1 <= fold.end && memberAt(runEnd + 1)) {
                     runEnd += 1;
                   }
                   const run = items.slice(itemIndex, runEnd + 1);

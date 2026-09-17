@@ -7,13 +7,16 @@ import { describe, it } from "vitest";
 import type { Block } from "../lib/session";
 import { AgentTranscript } from "./AgentTranscript";
 import {
-  foldedBlocks,
   foldableWork,
+  foldContentCounts,
+  foldedBlocks,
   groupTurnItems,
   groupTurns,
   isCollapsibleWork,
   isNarrationItem,
   isProseBlock,
+  isSettledFoldMember,
+  settledFold,
   workSummaryLine,
 } from "./transcriptActivity";
 
@@ -47,34 +50,26 @@ function report(id: string, blocks: Block[]) {
     (b) => b.role === "assistant" && b.text.trim(),
   ).length;
   const users = blocks.filter((b) => b.role === "user").length;
-  // Prose that folds with the work or absorbs into an exchange explains the
-  // gap between stored prose and visible answers: narration + replies +
-  // answers should add back up to the stored count.
-  let narration = 0;
-  let replies = 0;
+  // The settled fold defers earlier messages and routine exchanges; the
+  // fold line counts them. stored prose = answers + earlier + replies.
+  let earlier = 0;
+  let inputs = 0;
   for (const turn of groupTurns(blocks)) {
     const items = groupTurnItems(
       turn.filter((b) => !b.orchestration),
       { settled: true },
     );
-    const fold = foldableWork(items);
-    items.forEach((item, index) => {
-      if (item.type === "exchange" && item.reply) replies += 1;
-      if (
-        fold &&
-        index >= fold.start &&
-        index <= fold.end &&
-        isNarrationItem(items, index)
-      ) {
-        narration += 1;
-      }
-    });
+    const fold = settledFold(items);
+    if (!fold) continue;
+    const counts = foldContentCounts(items, fold);
+    earlier += counts.messages;
+    inputs += counts.inputs;
   }
   console.log(
     [
       `\n=== ${id.slice(0, 8)} (${blocks.length} blocks) ===`,
       `stored:      prose=${prose} users=${users} subagents=${subagents} interjections=${interjections} status=${statusRows}`,
-      `folded-away: narration=${narration} replies=${replies} (answers + narration + replies should equal prose)`,
+      `folded-away: earlier=${earlier} advisor-inputs=${inputs} — answers + earlier should equal prose`,
       `settled-dom: exchanges=${count(markup, "data-exchange")} openExchanges=${count(markup, 'data-exchange="true"><button type="button" aria-expanded="true"')} subagentPanels=${count(markup, 'aria-label="Subagent:')} answers=${count(markup, "data-selectable-agent-response")} statusPres=${count(markup, 'px-4 py-2 text-content/50')} foldButtons=${count(markup, "Show the steps")}`,
       `live-dom:    exchanges=${count(live, "data-exchange")} subagentPanels=${count(live, 'aria-label="Subagent:')} answers=${count(live, "data-selectable-agent-response")}`,
       `markup bytes: ${markup.length}`,
@@ -92,17 +87,20 @@ function turnReport(id: string, blocks: Block[]) {
       turn.filter((b) => !b.orchestration),
       { settled: true },
     );
-    const fold = foldableWork(items);
+    const fold = settledFold(items);
     const folded = fold ? foldedBlocks(items, fold) : [];
     const visible = items
       .map((item, i) => {
-        const foldedWithWork =
+        const insideFold =
           fold &&
           i >= fold.start &&
           i <= fold.end &&
-          (isCollapsibleWork(item) || isNarrationItem(items, i));
-        if (foldedWithWork)
-          return isNarrationItem(items, i) ? `[narration]` : null;
+          isSettledFoldMember(item);
+        if (insideFold) {
+          if (item.type === "exchange") return `[ex(${item.notes.length})]`;
+          if (item.type === "block") return `[msg]`;
+          return null;
+        }
         if (item.type === "activity") {
           return `activity(${item.blocks.length})`;
         }
@@ -113,8 +111,7 @@ function turnReport(id: string, blocks: Block[]) {
         if (b.role === "user") return "USER";
         if (b.interjection) return `divider(${b.interjection.customType})`;
         if (b.role === "system") return "status";
-        if (isProseBlock(b))
-          return isNarrationItem(items, i) ? `prose·` : `prose`;
+        if (isProseBlock(b)) return `prose`;
         return b.role;
       })
       .filter(Boolean);
