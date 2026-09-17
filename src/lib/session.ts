@@ -14,7 +14,7 @@ import {
 } from "./models";
 
 export type HarnessId =
-  "claude" | "codex" | "cursor" | "grok" | "opencode" | "pi" | "omp" | "fx" | "kimi" | "antigravity";
+  "claude" | "codex" | "cursor" | "grok" | "opencode" | "pi" | "omp" | "fx";
 
 export const HARNESSES: HarnessId[] = [
   "claude",
@@ -25,8 +25,6 @@ export const HARNESSES: HarnessId[] = [
   "pi",
   "omp",
   "fx",
-  "kimi",
-  "antigravity",
 ];
 
 export type BlockRole =
@@ -373,8 +371,6 @@ export const HARNESS_LABEL: Record<HarnessId, string> = {
   pi: "pi",
   omp: "omp",
   fx: "fx",
-  kimi: "kimi",
-  antigravity: "antigravity",
 };
 
 export const HARNESS_TITLE: Record<HarnessId, string> = {
@@ -386,8 +382,6 @@ export const HARNESS_TITLE: Record<HarnessId, string> = {
   pi: "Pi",
   omp: "omp",
   fx: "fx",
-  kimi: "Kimi Code",
-  antigravity: "Antigravity",
 };
 
 /** fx ACP rejects attachment prompt blocks. */

@@ -6,8 +6,6 @@ import {
   resolveCursorBinary,
   resolveFxBinary,
   resolveGrokBinary,
-  resolveKimiBinary,
-  resolveAntigravityBinary,
   resolveOmpBinary,
   resolveOpenCodeBinary,
   resolvePiBinary,
@@ -32,8 +30,6 @@ const CLI: Record<HarnessId, { name: string; install?: string }> = {
   pi: { name: "Pi CLI", install: "npm i -g @earendil-works/pi-coding-agent" },
   omp: { name: "omp CLI", install: "curl -fsSL https://omp.sh/install | sh" },
   fx: { name: "fx CLI", install: "curl -fsSL https://fx.sh/setup.sh | bash" },
-  kimi: { name: "Kimi Code CLI", install: "https://moonshotai.github.io/kimi-code/" },
-  antigravity: { name: "Antigravity ACP server (agy_acp_server.par)" },
 };
 
 let availability: HarnessAvailability = {
@@ -45,8 +41,6 @@ let availability: HarnessAvailability = {
   pi: false,
   omp: false,
   fx: false,
-  kimi: false,
-  antigravity: false,
 };
 let version = 0;
 let inflight: Promise<void> | null = null;
@@ -54,7 +48,7 @@ let probedAt = 0;
 const listeners = new Set<() => void>();
 
 /**
- * A probe stats many paths across the resolvers. The model picker and the
+ * A probe stats ~100 paths across eight resolvers. The model picker and the
  * providers pane both probe on open, so without a TTL every open pays for it
  * again to learn what it already knows. Installing a CLI mid-session is rare,
  * and `force` covers it.
@@ -160,14 +154,6 @@ export function probeHarnessAvailability(
       if (id === "grok") {
         try {
           await resolveGrokBinary();
-          return [id, true] as const;
-        } catch {
-          return [id, false] as const;
-        }
-      }
-      if (id === "kimi" || id === "antigravity") {
-        try {
-          await (id === "kimi" ? resolveKimiBinary() : resolveAntigravityBinary());
           return [id, true] as const;
         } catch {
           return [id, false] as const;

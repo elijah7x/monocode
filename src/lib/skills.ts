@@ -66,8 +66,6 @@ export type SkillSource =
   | "omp"
   | "fx"
   | "grok"
-  | "kimi"
-  | "antigravity"
   | "monocode";
 
 type SkillCommon = {

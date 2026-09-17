@@ -76,24 +76,6 @@ export {
   forgetGrokSession,
   bindGrokSession,
 } from "./grok";
-export {
-  sendKimiTurn,
-  steerKimiTurn,
-  cancelKimiTurn,
-  stopKimiSession,
-  forgetKimiSession,
-  respondKimiApproval,
-  bindKimiSession,
-} from "./kimi";
-export {
-  sendAntigravityTurn,
-  steerAntigravityTurn,
-  cancelAntigravityTurn,
-  stopAntigravitySession,
-  forgetAntigravitySession,
-  respondAntigravityApproval,
-  bindAntigravitySession,
-} from "./antigravity";
 export { generateCursorSessionTitle } from "./cursorTitle";
 export { generateCodexSessionTitle } from "./codexTitle";
 export { generateOpenCodeSessionTitle } from "./opencodeTitle";
@@ -133,8 +115,6 @@ export { refreshClaudeCatalog } from "./claudeCatalog";
 export { refreshPiCatalog, refreshOmpCatalog } from "./piCatalog";
 export { refreshFxCatalog } from "./fxCatalog";
 export { refreshGrokCatalog } from "./grokCatalog";
-export { refreshKimiCatalog } from "./kimiCatalog";
-export { refreshAntigravityCatalog } from "./antigravityCatalog";
 export { registerBuiltinHarnesses } from "./register";
 export {
   getHarnessAvailabilitySnapshot,
