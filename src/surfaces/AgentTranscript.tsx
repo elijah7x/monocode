@@ -603,25 +603,34 @@ function AgentTranscriptComponent({
               {items.flatMap((item, itemIndex) => {
                 const inSpan =
                   !!fold && itemIndex >= fold.start && itemIndex <= fold.end;
-                // Only work collapses. Reader content the span crosses —
-                // delivered prose, interjections, pinned runs — keeps its row
-                // whether the work is open or shut, so a settled transcript
-                // reads like the live one did.
-                if (inSpan && isCollapsibleWork(item)) {
-                  // Contiguous collapsible groups share one folded wrapper;
-                  // visible content between runs closes it and the next run
-                  // opens a new one, all under the same control.
-                  if (
-                    itemIndex > fold.start &&
-                    isCollapsibleWork(items[itemIndex - 1])
-                  ) {
-                    return [];
+                // Work collapses, and narration — prose the agent addressed
+                // to itself between two completed work groups — collapses
+                // with it. Delivered prose, interjections, and pinned runs
+                // keep their rows whether the work is open or shut, so a
+                // settled transcript reads like the live one did.
+                const foldMember =
+                  isCollapsibleWork(item) ||
+                  isNarrationItem(items, itemIndex);
+                if (inSpan && foldMember) {
+                  // Contiguous members share one folded wrapper; visible
+                  // content between runs closes it and the next run opens a
+                  // new one, all under the same control.
+                  if (itemIndex > fold.start) {
+                    const prev = items[itemIndex - 1];
+                    const prevMember =
+                      isCollapsibleWork(prev) ||
+                      isNarrationItem(items, itemIndex - 1);
+                    if (prevMember) return [];
                   }
                   let runEnd = itemIndex;
-                  while (
-                    runEnd + 1 <= fold.end &&
-                    isCollapsibleWork(items[runEnd + 1])
-                  ) {
+                  while (runEnd + 1 <= fold.end) {
+                    const next = items[runEnd + 1];
+                    if (
+                      !isCollapsibleWork(next) &&
+                      !isNarrationItem(items, runEnd + 1)
+                    ) {
+                      break;
+                    }
                     runEnd += 1;
                   }
                   const run = items.slice(itemIndex, runEnd + 1);
@@ -633,7 +642,9 @@ function AgentTranscriptComponent({
                         run.map((entry, offset) => (
                           <div
                             key={turnItemKey(entry)}
-                            className={`flow-root pb-1 last:pb-0 pl-5 zen-fold-rail ${
+                            className={`flow-root pb-1 last:pb-0 pl-5 zen-fold-rail${
+                              entry.type === "block" ? " zen-narration" : ""
+                            } ${
                               tail && offset === run.length - 1
                                 ? "zen-fold-tail"
                                 : ""

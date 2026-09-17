@@ -38,7 +38,7 @@ function tool(id: string): Block {
 }
 
 describe("prose inside the work span", () => {
-  it("keeps delivered prose at full strength; only the work collapses", () => {
+  it("folds step narration with the work; delivered answers keep their row", () => {
     const blocks: Block[] = [
       { id: "user", role: "user", text: "Keep me posted" },
       tool("t1"),
@@ -52,9 +52,9 @@ describe("prose inside the work span", () => {
     ];
     act(() => root.render(createElement(AgentTranscript, { blocks })));
 
-    // The prose the span crosses keeps its own row at full strength; only
-    // the tool work is out of the DOM until asked for.
-    expect(container.textContent).toContain("Trying the other config.");
+    // Prose sandwiched by two finished work groups is narration: it folds
+    // with the work. The answer after the last work group keeps its row.
+    expect(container.textContent).not.toContain("Trying the other config.");
     expect(container.textContent).toContain("The investigation is complete.");
     expect(container.textContent).not.toContain("Inspect t1");
     expect(container.textContent).not.toContain("Inspect t2");
@@ -65,7 +65,7 @@ describe("prose inside the work span", () => {
 
     act(() => toggle.click());
 
-    // Expanded, the work returns to its original positions around the note.
+    // Expanded, the work and its narration return to their original order.
     const text = container.textContent ?? "";
     expect(text).toContain("Inspect t1");
     expect(text).toContain("Inspect t2");
