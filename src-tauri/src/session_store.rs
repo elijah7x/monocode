@@ -36,8 +36,12 @@ impl SessionStore {
             std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
         let conn = Connection::open(path).map_err(|e| e.to_string())?;
-        conn.execute_batch("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;")
-            .map_err(|e| e.to_string())?;
+        // X and the release build share one data dir; a write from the other
+        // app must wait out a held lock instead of failing on SQLITE_BUSY.
+        conn.execute_batch(
+            "PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;",
+        )
+        .map_err(|e| e.to_string())?;
         migrate(&conn).map_err(|e| e.to_string())?;
         Ok(Self {
             conn: Mutex::new(conn),
