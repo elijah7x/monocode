@@ -37,8 +37,8 @@ function tool(id: string): Block {
   };
 }
 
-describe("prose folded into the work trail", () => {
-  it("marks a mid-turn note as process, leaving the answer at full strength", () => {
+describe("prose inside the work span", () => {
+  it("keeps delivered prose at full strength; only the work collapses", () => {
     const blocks: Block[] = [
       { id: "user", role: "user", text: "Keep me posted" },
       tool("t1"),
@@ -52,9 +52,12 @@ describe("prose folded into the work trail", () => {
     ];
     act(() => root.render(createElement(AgentTranscript, { blocks })));
 
-    // The trail stays collapsed until asked for, so none of what it holds —
-    // the note included — is in the DOM yet.
-    expect(container.querySelector(".zen-fold-prose")).toBeNull();
+    // The prose the span crosses keeps its own row at full strength; only
+    // the tool work is out of the DOM until asked for.
+    expect(container.textContent).toContain("Trying the other config.");
+    expect(container.textContent).toContain("The investigation is complete.");
+    expect(container.textContent).not.toContain("Inspect t1");
+    expect(container.textContent).not.toContain("Inspect t2");
     const toggle = container.querySelector<HTMLButtonElement>(
       'button[aria-label="Show the work"]',
     )!;
@@ -62,20 +65,15 @@ describe("prose folded into the work trail", () => {
 
     act(() => toggle.click());
 
-    // Only the mid-turn note carries the marker; the tool rows it sits
-    // between stay ordinary rail entries.
-    const prose = container.querySelectorAll(".zen-fold-prose");
-    expect(prose).toHaveLength(1);
-    expect(prose[0].textContent).toContain("Trying the other config.");
-    expect(prose[0].textContent).not.toContain(
-      "The investigation is complete.",
+    // Expanded, the work returns to its original positions around the note.
+    const text = container.textContent ?? "";
+    expect(text).toContain("Inspect t1");
+    expect(text).toContain("Inspect t2");
+    expect(text.indexOf("Inspect t1")).toBeLessThan(
+      text.indexOf("Trying the other config."),
     );
-
-    // The answer renders the same markdown root, outside the demoted wrapper.
-    const answer = Array.from(
-      container.querySelectorAll(".agent-markdown"),
-    ).find((el) => el.textContent?.includes("The investigation is complete."));
-    expect(answer).not.toBeUndefined();
-    expect(answer?.closest(".zen-fold-prose")).toBeNull();
+    expect(text.indexOf("Trying the other config.")).toBeLessThan(
+      text.indexOf("Inspect t2"),
+    );
   });
 });
