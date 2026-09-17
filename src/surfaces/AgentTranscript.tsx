@@ -94,6 +94,7 @@ import {
   initialThinkingIndex,
   isCollapsibleWork,
   isIncompleteTool,
+  isNarrationItem,
   isSubagentBlock,
   isThinkingBlock,
   lastActivityIndex,
@@ -646,7 +647,12 @@ function AgentTranscriptComponent({
                   ];
                 }
                 const row = (
-                  <div key={turnItemKey(item)} className="flow-root pb-1">
+                  <div
+                    key={turnItemKey(item)}
+                    className={`flow-root pb-1${
+                      isNarrationItem(items, itemIndex) ? " zen-narration" : ""
+                    }`}
+                  >
                     {renderItem(item, itemIndex)}
                   </div>
                 );
@@ -3035,8 +3041,10 @@ function ExchangeRow({
   const { severityText, severityClass } = topSeverity
     ? interjectionChrome(topSeverity)
     : { severityText: undefined, severityClass: "text-content/55" };
+  // With a reply attached, the collapsed row previews what the agent said
+  // back — if the reply was misclassified, its first line still shows.
   const preview = proseSummary(
-    interjections[interjections.length - 1]?.text ?? "",
+    reply?.text ?? interjections[interjections.length - 1]?.text ?? "",
   );
 
   return (
