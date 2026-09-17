@@ -7,8 +7,8 @@ import grok from "../assets/providers/grok.svg";
 import omp from "../assets/providers/omp.svg";
 import opencode from "../assets/providers/opencode.svg";
 import pi from "../assets/providers/pi.svg";
-import kimi from "../assets/providers/kimi.png";
-import antigravity from "../assets/providers/antigravity.png";
+import kimi from "../assets/providers/kimi.svg";
+import antigravity from "../assets/providers/antigravity.svg";
 import type { HarnessId } from "../lib/session";
 
 export const HARNESS_ICONS: Record<HarnessId, string> = {
@@ -31,6 +31,8 @@ export const MONOCHROME_HARNESSES = new Set<HarnessId>([
   "opencode",
   "pi",
   "fx",
+  "kimi",
+  "antigravity",
 ]);
 
 function MonoIcon({
@@ -61,6 +63,20 @@ export function HarnessIcon({
   harness: HarnessId;
   className?: string;
 }) {
+  if (harness === "kimi") {
+    return (
+      <MonoIcon className={className} viewBox="0 0 32 32">
+        <path d="M6 5h5v10L21 5h6L16 16l11 11h-7l-9-10v10H6Z" />
+      </MonoIcon>
+    );
+  }
+  if (harness === "antigravity") {
+    return (
+      <MonoIcon className={className} viewBox="0 0 32 32">
+        <path d="m16 3 13 25h-6l-7-15-7 15H3Zm-4 19h8v4h-8Z" />
+      </MonoIcon>
+    );
+  }
   if (harness === "cursor") {
     return (
       <MonoIcon className={className}>
