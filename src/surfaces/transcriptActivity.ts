@@ -356,6 +356,119 @@ function isExchangeContinuation(notes: Block[], block: Block): boolean {
 }
 
 /**
+ * A settled turn's fold: everything between the first work group and the
+ * terminal message — tools, step narration, routine advisor exchanges —
+ * behind the one line that says how long it took. Position cannot separate
+ * a delivered mid-turn answer from running commentary, so this does not
+ * pretend to: it is an "earlier conversation and work" disclosure, and the
+ * fold line counts what it holds. The terminal assistant message — with
+ * the fragments a splitStream note cut off it, which reconstruction still
+ * evidences — always keeps its row. Notices, open approvals, delegated
+ * runs, and exchanges carrying a blocker or a non-advisor channel keep
+ * theirs too, splitting the fold into runs under one control.
+ */
+export function settledFold(items: TurnItem[]): WorkFold | undefined {
+  // Anything still in flight — a pending approval, a running call — is not
+  // scenery: keep the turn open until it resolves.
+  if (items.some(itemInFlight)) return undefined;
+  const proseAt = (index: number) => {
+    const item = items[index];
+    return item?.type === "block" && isProseBlock(item.block)
+      ? item.block
+      : undefined;
+  };
+  let last = -1;
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    if (proseAt(index)) {
+      last = index;
+      break;
+    }
+  }
+  // No terminal message means there is no visible response to stand in for
+  // what the fold would hide.
+  if (last < 0) return undefined;
+  // The terminal message is the last prose block — not the trailing run of
+  // prose items, which in this data model are separate messages (adjacent
+  // fragments of one message only exist where a note split it, and carry
+  // evidence). Walk back over that evidence alone: a continuation opening
+  // the protected region pulls in the note that split it and the earlier
+  // fragment it continues.
+  let terminal = last;
+  for (;;) {
+    const exchange = items[terminal - 1];
+    const before = proseAt(terminal - 2);
+    const fragment = proseAt(terminal);
+    if (
+      exchange?.type === "exchange" &&
+      before &&
+      fragment &&
+      isExchangeContinuation(exchange.notes, fragment)
+    ) {
+      terminal -= 2;
+      continue;
+    }
+    break;
+  }
+  const start = firstWorkIndex(items);
+  if (start < 0 || start >= terminal) return undefined;
+  return { start, end: terminal - 1 };
+}
+
+/** Anything in the turn that is still moving is not scenery. */
+function itemInFlight(item: TurnItem): boolean {
+  if (item.type === "activity") return activityStillRunning(item.blocks);
+  if (item.type === "subagents") return hasRunningSubagent(item.blocks);
+  if (item.type === "exchange") return false;
+  return (
+    needsApproval(item.block) || toolCallState(item.block) === "pending"
+  );
+}
+
+/**
+ * What hides inside a settled fold: finished work, earlier prose, routine
+ * advisor exchanges. What keeps its row: notices, approvals still open,
+ * delegated runs, and exchanges carrying a blocker or a channel with no
+ * collapse contract.
+ */
+export function isSettledFoldMember(item: TurnItem): boolean {
+  if (item.type === "activity") return isCollapsibleWork(item);
+  if (item.type === "subagents") return false;
+  if (item.type === "exchange") {
+    return item.notes.every(
+      (note) =>
+        !note.interjection ||
+        (note.interjection.customType === "advisor" &&
+          note.interjection.severity !== "blocker"),
+    );
+  }
+  return (
+    isProseBlock(item.block) &&
+    !isNoticeBlock(item.block) &&
+    !needsApproval(item.block)
+  );
+}
+
+/** What the settled fold's line discloses: hidden messages and inputs. */
+export function foldContentCounts(
+  items: TurnItem[],
+  fold: WorkFold,
+): { messages: number; inputs: number } {
+  let messages = 0;
+  let inputs = 0;
+  for (const item of items.slice(fold.start, fold.end + 1)) {
+    if (item.type === "exchange") {
+      if (isSettledFoldMember(item)) {
+        inputs += item.notes.filter((note) => note.interjection).length;
+        if (item.reply) messages += 1;
+      }
+      continue;
+    }
+    if (item.type === "block" && isProseBlock(item.block)) messages += 1;
+  }
+  return { messages, inputs };
+}
+
+/**
  * Prose talking to itself between two finished work groups is step
  * narration — demote it, never hide it. A maximal prose run demotes as a
  * unit when work flanks both ends. Both flanks must be collapsible groups
