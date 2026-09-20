@@ -31,7 +31,7 @@ export function refreshAntigravityCatalog(): Promise<void> {
 }
 
 async function discoverModels() {
-  const { path } = await resolveAntigravityBinary();
+  const { path, args } = await resolveAntigravityBinary();
   const cwd = await homeDir();
   const acp = new AcpClient(PROBE_ID, {
     onRequest: (id, method) => {
@@ -47,7 +47,7 @@ async function discoverModels() {
     () => acp.close(new Error("Antigravity probe exited")),
   );
   try {
-    await spawnChild(PROBE_ID, path, [], antigravitySpawnCwd(path, cwd));
+    await spawnChild(PROBE_ID, path, args, antigravitySpawnCwd(path, cwd));
     await acp.request(
       "initialize",
       {

@@ -74,6 +74,21 @@ pub struct CursorBinary {
     pub path: String,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AntigravityBinary {
+    pub path: String,
+    pub args: Vec<String>,
+}
+
+fn antigravity_args() -> Vec<String> {
+    if cfg!(target_os = "linux") {
+        vec!["--uid=".into()]
+    } else {
+        Vec::new()
+    }
+}
+
 struct LiveChild {
     stdin: Mutex<ChildStdin>,
     pid: u32,
@@ -362,10 +377,11 @@ pub fn harness_resolve_hermes() -> Result<CursorBinary, String> {
 
 /// Antigravity's ACP server is separate from the interactive agy CLI.
 #[tauri::command(async)]
-pub fn harness_resolve_antigravity() -> Result<CursorBinary, String> {
+pub fn harness_resolve_antigravity() -> Result<AntigravityBinary, String> {
     resolve_antigravity()
-        .map(|path| CursorBinary {
+        .map(|path| AntigravityBinary {
             path: path.to_string_lossy().into_owned(),
+            args: antigravity_args(),
         })
         .ok_or_else(|| {
             "Antigravity ACP server (agy_acp_server.par) not found. Install Antigravity and run `agy` once in Terminal.".into()
@@ -2778,6 +2794,15 @@ mod tests {
         ));
         assert!(!looks_like_harness_argv("agy --help"));
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn antigravity_launch_args_match_the_platform_registry() {
+        if cfg!(target_os = "linux") {
+            assert_eq!(antigravity_args(), vec!["--uid="]);
+        } else {
+            assert!(antigravity_args().is_empty());
+        }
     }
 
     #[test]

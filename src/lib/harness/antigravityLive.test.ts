@@ -32,7 +32,7 @@ vi.mock("./child", () => ({
     if (mock.resolveGates) {
       await new Promise<void>((resolve) => mock.resolveGates.push(resolve));
     }
-    return { path: "/fake/agy_acp_server.par" };
+    return { path: "/fake/agy_acp_server.par", args: ["--uid="] };
   },
   spawnChild: mock.spawn,
   killChild: mock.kill,
@@ -94,7 +94,7 @@ const providers = [
   { id: "antigravity", send: agy.sendAntigravityTurn, cancel: agy.cancelAntigravityTurn,
     stop: agy.stopAntigravitySession, forget: agy.forgetAntigravitySession,
     bind: agy.bindAntigravitySession, respond: agy.respondAntigravityApproval,
-    refresh: refreshAntigravityCatalog, path: "/fake/agy_acp_server.par", args: [] as string[], plan: "default", auth: "agy` once" },
+    refresh: refreshAntigravityCatalog, path: "/fake/agy_acp_server.par", args: ["--uid="] as string[], plan: "default", auth: "agy` once" },
 ] as const;
 
 // Each spawned generation registers under a scoped child key `thread#n`.
@@ -104,8 +104,8 @@ const liveKey = () => childKeys().at(-1)!;
 const childListener = () => mock.listeners.get(liveKey())!;
 const genKey = expect.stringMatching(/^thread#\d+$/);
 
-function permission(kind = "execute") {
-  childListener()(JSON.stringify({ jsonrpc: "2.0", id: 100,
+function permission(kind = "execute", id = 100) {
+  childListener()(JSON.stringify({ jsonrpc: "2.0", id,
     method: "session/request_permission", params: {
       toolCall: { toolCallId: "tool-1", title: "Do work", kind },
       options: [ { optionId: "yes", kind: "allow_once" }, { optionId: "no", kind: "reject_once" } ],
@@ -116,7 +116,7 @@ function finishPrompt() {
   const prompt = mock.sent.findLast((message) => message.method === "session/prompt")!;
   childListener()(JSON.stringify({ jsonrpc: "2.0", id: prompt.id, result: { stopReason: mock.promptStop } }));
 }
-const response = () => mock.sent.findLast((message) => message.id === 100 && message.result)?.result;
+const response = (id = 100) => mock.sent.findLast((message) => message.id === id && message.result)?.result;
 const waitPrompt = () => vi.waitFor(() => expect(mock.sent.some((m) => m.method === "session/prompt")).toBe(true));
 const flush = async () => {
   for (let i = 0; i < 100; i++) await Promise.resolve();
@@ -180,6 +180,17 @@ describe.each(providers)("$id offline ACP transport", (provider) => {
     expect(events.some((e) => e.type === "approval.requested")).toBe(false);
     finishPrompt();
     await turn;
+  });
+
+  it("rejects permission requests outside an active prompt", async () => {
+    mock.autoPrompt = true;
+    await provider.send({ ...input, runtimeMode: "full-access" });
+    permission("execute", 101);
+    await vi.waitFor(() =>
+      expect(response(101)).toEqual({ outcome: { outcome: "cancelled" } }),
+    );
+    expect(events.some((event) => event.type === "approval.requested")).toBe(false);
+    expect(events.some((event) => event.type === "tool.updated")).toBe(false);
   });
 
   it("cancels a pending approval and suppresses late text", async () => {

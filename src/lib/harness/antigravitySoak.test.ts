@@ -13,6 +13,7 @@ const BIN =
   process.env.AGY_BIN ??
   join(homedir(), ".local/bin/agy_acp_server.par");
 const REAL = process.env.AGY_SOAK === "1" && existsSync(BIN);
+const ARGS = process.platform === "linux" ? ["--uid="] : [];
 const MODEL = "antigravity:gemini-3.8-flash-low";
 const LOW = { effort: "low" } as const;
 
@@ -28,7 +29,7 @@ vi.mock("./child", async () => {
   const { spawn } = await import("node:child_process");
   const readline = await import("node:readline");
   return {
-    resolveAntigravityBinary: async () => ({ path: BIN }),
+    resolveAntigravityBinary: async () => ({ path: BIN, args: ARGS }),
     spawnChild: async (
       id: string,
       command: string,

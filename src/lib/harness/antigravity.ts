@@ -386,7 +386,7 @@ async function startLive(input: SendTurnInput, life: number): Promise<Live> {
   if (retired()) throw new Error("Antigravity session stopped during startup");
   const childKey = `${input.sessionId}#${childSeq++}`;
 
-  const { path } = await resolveAntigravityBinary();
+  const { path, args } = await resolveAntigravityBinary();
   const handlers: AcpHandlers = {};
   const acp = new AcpClient(childKey, handlers);
   const pendingSetup = { acp, childKey };
@@ -462,7 +462,7 @@ async function startLive(input: SendTurnInput, life: number): Promise<Live> {
     // Binary resolution awaited above may have raced a stop/forget — re-check
     // before the child is ever spawned, not just after.
     if (retired()) throw new Error("Antigravity session stopped during startup");
-    await spawnChild(childKey, path, [], antigravitySpawnCwd(path, input.cwd));
+    await spawnChild(childKey, path, args, antigravitySpawnCwd(path, input.cwd));
     if (retired()) throw new Error("Antigravity session stopped during startup");
     try {
       await acp.request(
@@ -764,7 +764,12 @@ async function handlePermission(live: Live, id: number, params: unknown) {
   const request = permissionRequestFromAcp(params);
   // Protocol replies always flow; UI events are gated on the turn still being
   // live so a cancelled run cannot leave approval cards behind.
-  if (request.callId && !live.cancelled && !live.muteUpdates) {
+  if (
+    request.callId &&
+    live.promptInFlight &&
+    !live.cancelled &&
+    !live.muteUpdates
+  ) {
     live.onEvent({
       type: "tool.updated",
       callId: request.callId,
@@ -774,7 +779,12 @@ async function handlePermission(live: Live, id: number, params: unknown) {
     });
   }
   let optionId: string | null;
-  if (live.cancelled || live.muteUpdates || request.optionIds.length === 0) {
+  if (
+    !live.promptInFlight ||
+    live.cancelled ||
+    live.muteUpdates ||
+    request.optionIds.length === 0
+  ) {
     optionId = null;
   } else if (live.planning) {
     optionId = permissionOptionId(
