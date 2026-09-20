@@ -672,7 +672,7 @@ async function setConfigOption(
     params,
     CONTROL_TIMEOUT_MS,
   );
-  if (result?.configOptions) {
+  if (Array.isArray(result?.configOptions)) {
     live.configOptions = readConfigOptions(result.configOptions);
     live.modelConfigId = extractModelConfigId(live.configOptions);
   }
@@ -728,7 +728,10 @@ function handleNotification(live: Live, method: string, params: unknown) {
   const update = asRecord(rec?.update) ?? rec;
   // Config state stays fresh even while the transcript is muted — a stale
   // currentValue would resend set_config_option for a value already applied.
-  if (update?.sessionUpdate === "config_option_update") {
+  if (
+    update?.sessionUpdate === "config_option_update" &&
+    Array.isArray(update.configOptions)
+  ) {
     live.configOptions = readConfigOptions(update.configOptions);
     live.modelConfigId = extractModelConfigId(live.configOptions);
   }

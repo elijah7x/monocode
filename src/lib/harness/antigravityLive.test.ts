@@ -23,6 +23,7 @@ const mock = vi.hoisted(() => {
     blockWrites: false,
     resolveGates: null as Array<() => void> | null,
     setupConfigOptions: null as unknown[] | null,
+    setConfigResult: null as unknown,
   };
 });
 vi.mock("../fs", () => ({ homeDir: async () => "/home/test" }));
@@ -78,6 +79,8 @@ vi.mock("./child", () => ({
         ? setup
         : method === "session/prompt"
           ? { stopReason: mock.promptStop }
+          : method === "session/set_config_option" && mock.setConfigResult != null
+            ? mock.setConfigResult
           : {};
       mock.listeners.get(thread)?.(JSON.stringify({ jsonrpc: "2.0", id: message.id, result }));
     });
@@ -131,6 +134,7 @@ describe.each(providers)("$id offline ACP transport", (provider) => {
     mock.blockWrites = false;
     mock.resolveGates = null;
     mock.setupConfigOptions = null;
+    mock.setConfigResult = null;
     mock.spawn.mockClear();
     mock.kill.mockClear();
     events = [];
@@ -594,6 +598,35 @@ describe.each(providers)("$id offline ACP transport", (provider) => {
     );
     // Boolean options go out as the typed boolean variant, not a string.
     expect(set?.params).toMatchObject({ configId: "fast", type: "boolean", value: true });
+  });
+
+  it("preserves config options after a malformed set-config response", async () => {
+    mock.setConfigResult = { configOptions: { invalid: true } };
+    mock.autoPrompt = true;
+    await provider.send({ ...input, modelSettings: { effort: "high" } });
+    mock.sent.length = 0;
+    await provider.send({ ...input, model: `${provider.id}:m2` });
+    expect(mock.sent.find((m) => m.method === "session/set_config_option")?.params)
+      .toMatchObject({ configId: "model", value: "m2" });
+  });
+
+  it("preserves config options after a malformed config update", async () => {
+    mock.autoPrompt = true;
+    await provider.send(input);
+    childListener()(JSON.stringify({
+      jsonrpc: "2.0",
+      method: "session/update",
+      params: {
+        update: {
+          sessionUpdate: "config_option_update",
+          configOptions: { invalid: true },
+        },
+      },
+    }));
+    mock.sent.length = 0;
+    await provider.send({ ...input, modelSettings: { effort: "high" } });
+    expect(mock.sent.find((m) => m.method === "session/set_config_option")?.params)
+      .toMatchObject({ configId: "thinking", value: "high" });
   });
 
   it("routes a cancel reentered from session.started through the live path", async () => {
